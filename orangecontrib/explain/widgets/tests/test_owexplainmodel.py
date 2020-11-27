@@ -219,7 +219,7 @@ class TestOWExplainModel(WidgetTest):
         self.send_signal(self.widget.Inputs.data, None)
         self.assertPlotEmpty(self.widget._violin_plot)
 
-    @unittest.mock.patch("orangecontrib.prototypes.widgets.owexplainmodel.run")
+    @unittest.mock.patch("orangecontrib.explain.widgets.owexplainmodel.run")
     def test_data_sampled_info(self, mocked_run):
         mocked_run.side_effect = dummy_run
         self.send_signal(self.widget.Inputs.data, self.iris)

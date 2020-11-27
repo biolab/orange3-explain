@@ -13,7 +13,7 @@ from Orange.data import Table
 from Orange.regression import RandomForestRegressionLearner
 from Orange.widgets.tests.base import WidgetTest
 
-from orangecontrib.explain.widgets.owexplainpred import StripePlot, \
+from orangecontrib.explain.widgets.owexplainprediction import StripePlot, \
     OWExplainPrediction
 
 
