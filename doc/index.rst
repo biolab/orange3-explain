@@ -8,7 +8,8 @@ Widgets
 .. toctree::
    :maxdepth: 1
 
-   widgets/mywidget
+   widgets/explain-model
+   widgets/explain-prediction
 
 Indices and tables
 ==================
@@ -16,4 +17,3 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-
