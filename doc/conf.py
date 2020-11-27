@@ -50,7 +50,7 @@ source_parsers = {".md": "recommonmark.parser.CommonMarkParser"}
 master_doc = 'index'
 
 # General information about the project.
-project = 'Orange3 Example Add-on'
+project = 'Orange3 Explain'
 copyright = '2015, Biolab'
 author = 'Biolab'
 
@@ -204,7 +204,7 @@ html_static_path = ['static']
 #html_search_scorer = 'scorer.js'
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'Orange3ExampleAdd-ondoc'
+htmlhelp_basename = 'Orange3Explain'
 
 # -- Options for LaTeX output ---------------------------------------------
 
@@ -226,7 +226,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-  (master_doc, 'Orange3ExampleAdd-on.tex', 'Orange3 Example Add-on Documentation',
+  (master_doc, 'Orange3Expalin.tex', 'Orange3 Explain Documentation',
    'Biolab', 'manual'),
 ]
 
@@ -256,7 +256,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'orange3exampleadd-on', 'Orange3 Example Add-on Documentation',
+    (master_doc, 'orange3explain', 'Orange3 Explain Documentation',
      [author], 1)
 ]
 
@@ -270,8 +270,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  (master_doc, 'Orange3ExampleAdd-on', 'Orange3 Example Add-on Documentation',
-   author, 'Orange3ExampleAdd-on', 'One line description of project.',
+  (master_doc, 'Orange3Explain', 'Orange3 Explain Documentation',
+   author, 'Orange3Explain', 'One line description of project.',
    'Miscellaneous'),
 ]
 

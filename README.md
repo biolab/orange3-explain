@@ -1,14 +1,14 @@
-Orange3 Example Add-on
-======================
+Orange3 Explain
+===============
 
-This is an example add-on for [Orange3](http://orange.biolab.si). Add-on can extend Orange either 
-in scripting or GUI part, or in both. We here focus on the GUI part and implement a simple (empty) widget,
-register it with Orange and add a new workflow with this widget to example tutorials.
+Orange3 Explain is an add-on for the [Orange3](http://orange.biolab.si) 
+data mining suite. It provides extensions for explanatory AI.
 
 Installation
 ------------
+Install from Orange add-on installer through Options - Add-ons.
 
-To install the add-on, run
+To install the add-on from source run
 
     pip install .
 
@@ -17,20 +17,16 @@ Python's site-packages directory), run
 
     pip install -e .
 
-Documentation / widget help can be built by running
-
-    make html htmlhelp
-
-from the doc directory.
-
 Usage
 -----
 
 After the installation, the widget from this add-on is registered with Orange. To run Orange from the terminal,
 use
 
+    orange-canvas
+
+or
+
     python -m Orange.canvas
 
 The new widget appears in the toolbox bar under the section Example.
-
-![screenshot](https://github.com/biolab/orange3-example-addon/blob/master/screenshot.png)
