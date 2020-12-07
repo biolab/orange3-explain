@@ -24,8 +24,8 @@ matrix:
     - python: '3.8'
       env: ORANGE="release"
 
-    - python: '3.9'
-      env: ORANGE="master"
+#    - python: '3.9'
+#      env: ORANGE="master"
 
 cache:
     apt: true
