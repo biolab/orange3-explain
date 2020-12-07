@@ -39,6 +39,7 @@ DATA_FILES = [
 
 INSTALL_REQUIRES = [
     "Orange3",
+    "shap ==0.37.*",  # shap makes significant changes between versions
 ]
 
 ENTRY_POINTS = {
@@ -50,6 +51,12 @@ ENTRY_POINTS = {
         "html-index = orangecontrib.explain.widgets:WIDGET_HELP_PATH",
     ),
 }
+
+CLASSIFIERS = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3 :: Only",
+]
 
 
 def include_documentation(local_dir, install_dir):
@@ -77,21 +84,22 @@ def include_documentation(local_dir, install_dir):
 if __name__ == "__main__":
     include_documentation("doc/_build/html", "help/orange3-example")
     setup(
-        name=NAME,
-        version=VERSION,
         author=AUTHOR,
         author_email=AUTHOR_EMAIL,
-        url=URL,
+        classifiers=CLASSIFIERS,
+        data_files=DATA_FILES,
         description=DESCRIPTION,
+        entry_points=ENTRY_POINTS,
+        install_requires=INSTALL_REQUIRES,
+        keywords=KEYWORDS,
         long_description=LONG_DESCRIPTION,
         long_description_content_type="text/markdown",
         license=LICENSE,
+        name=NAME,
+        namespace_packages=["orangecontrib"],
         packages=PACKAGES,
         package_data=PACKAGE_DATA,
-        data_files=DATA_FILES,
-        install_requires=INSTALL_REQUIRES,
-        entry_points=ENTRY_POINTS,
-        keywords=KEYWORDS,
-        namespace_packages=["orangecontrib"],
+        url=URL,
+        version=VERSION,
         zip_safe=False,
     )

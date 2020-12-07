@@ -174,6 +174,10 @@ class TestExplainer(unittest.TestCase):
                         self.iris.X.shape, shap_values[i].shape
                     )
 
+    @unittest.skipIf(
+        not hasattr(test_regression, "all_learners"),
+        "all_learners not available in Orange < 3.26"
+    )
     def test_all_regressors(self):
         """ Test explanation for all regressors """
         for learner in test_regression.all_learners():
