@@ -82,7 +82,7 @@ def include_documentation(local_dir, install_dir):
 
 
 if __name__ == "__main__":
-    include_documentation("doc/_build/html", "help/orange3-example")
+    include_documentation("doc/_build/htmlhelp", "help/orange3-example")
     setup(
         author=AUTHOR,
         author_email=AUTHOR_EMAIL,
