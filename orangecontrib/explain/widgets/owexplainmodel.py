@@ -417,8 +417,12 @@ class GraphicsView(StickyGraphicsView):
 class OWExplainModel(OWWidget, ConcurrentWidgetMixin):
     name = "Explain Model"
     description = "Model explanation widget."
+    keywords = ["explain", "explain prediction", "explain model"]
     icon = "icons/ExplainModel.svg"
     priority = 100
+    replaces = [
+        "orangecontrib.prototypes.widgets.owexplainmodel.OWExplainModel"
+    ]
 
     class Inputs:
         data = Input("Data", Table, default=True)

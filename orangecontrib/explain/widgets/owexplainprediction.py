@@ -468,8 +468,12 @@ class StripePlot(QGraphicsWidget):
 class OWExplainPrediction(OWWidget, ConcurrentWidgetMixin):
     name = "Explain Prediction"
     description = "Prediction explanation widget."
+    keywords = ["explain", "explain prediction", "explain model"]
     icon = "icons/ExplainPred.svg"
     priority = 110
+    replaces = [
+        "orangecontrib.prototypes.widgets.owexplainpred.OWExplainPrediction"
+    ]
 
     class Inputs:
         model = Input("Model", Model)
