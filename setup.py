@@ -39,6 +39,10 @@ DATA_FILES = [
 
 INSTALL_REQUIRES = [
     "Orange3",
+    "AnyQt",
+    "numpy",
+    "pyqtgraph",
+    "scipy",
     "shap ==0.37.*",  # shap makes significant changes between versions
 ]
 
