@@ -3,7 +3,12 @@ Orange3 Explain
 
 Orange3 Explain is an add-on for the [Orange3](http://orange.biolab.si)
 data mining suite. It provides extensions for explanatory AI.
-See [documentation](http://orange3-imageanalytics.readthedocs.org/).
+See [documentation](http://orange3-explain.readthedocs.org/).
 
 Features
 --------
+- Explains a classification or regression model. Explains which features
+  contribute the most and how they contribute toward the prediction for a
+  specific class.
+- Explains which features contribute the most to the prediction for a single
+  instance based on the model and how they contribute.
