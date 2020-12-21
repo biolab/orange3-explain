@@ -46,6 +46,10 @@ INSTALL_REQUIRES = [
     "shap ==0.37.*",  # shap makes significant changes between versions
 ]
 
+EXTRAS_REQUIRE = {
+    'test': ['pytest', 'coverage']
+}
+
 ENTRY_POINTS = {
     "orange3.addon": ("Orange3-Explain = orangecontrib.explain",),
     # Entry point used to specify packages containing widgets.
@@ -65,14 +69,14 @@ CLASSIFIERS = [
 
 def include_documentation(local_dir, install_dir):
     global DATA_FILES
-    if "bdist_wheel" in sys.argv and not path.exists(local_dir):
-        print(
-            "Directory '{}' does not exist. "
-            "Please build documentation before running bdist_wheel.".format(
-                path.abspath(local_dir)
-            )
-        )
-        sys.exit(0)
+    # if "bdist_wheel" in sys.argv and not path.exists(local_dir):
+    #     print(
+    #         "Directory '{}' does not exist. "
+    #         "Please build documentation before running bdist_wheel.".format(
+    #             path.abspath(local_dir)
+    #         )
+    #     )
+    #     sys.exit(0)
 
     doc_files = []
     for dirpath, dirs, files in walk(local_dir):
@@ -95,6 +99,7 @@ if __name__ == "__main__":
         description=DESCRIPTION,
         entry_points=ENTRY_POINTS,
         install_requires=INSTALL_REQUIRES,
+        extras_require=EXTRAS_REQUIRE,
         keywords=KEYWORDS,
         long_description=LONG_DESCRIPTION,
         long_description_content_type="text/markdown",
