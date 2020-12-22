@@ -12,6 +12,7 @@ from AnyQt.QtWidgets import QGraphicsGridLayout, QGraphicsSimpleTextItem
 import pyqtgraph as pg
 
 from orangecanvas.gui.test import mouseMove
+from orangewidget.tests.base import WidgetTest
 
 import Orange
 from Orange.base import Learner
@@ -19,7 +20,6 @@ from Orange.classification import RandomForestLearner, OneClassSVMLearner, \
     IsolationForestLearner, EllipticEnvelopeLearner, LocalOutlierFactorLearner
 from Orange.data import Table, Domain
 from Orange.regression import RandomForestRegressionLearner
-from Orange.widgets.tests.base import WidgetTest
 
 from orangecontrib.explain.widgets.owexplainmodel import OWExplainModel, \
     ViolinPlot, ViolinItem, Results

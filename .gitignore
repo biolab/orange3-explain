@@ -7,11 +7,15 @@ dist
 *.pyd
 *.pyc
 MANIFEST
+.tox/
+
+.coverage
 
 # Cython generated files
 __pycache__
 
 # Editor files
+.vscode/
 .idea
 .idea/*
 *~
