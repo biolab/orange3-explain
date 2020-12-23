@@ -6,7 +6,7 @@ ICON = "icons/ExplainPred.svg"
 
 # Background color for category background in menu
 # and widget icon background in workflow.
-BACKGROUND = "light-blue"
+BACKGROUND = "#E4B8E4"
 
 # Location of widget help files.
 WIDGET_HELP_PATH = (
