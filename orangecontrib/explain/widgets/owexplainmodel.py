@@ -1,16 +1,17 @@
-from typing import Tuple, Optional, List, Callable
+from typing import Tuple, Optional, List, Callable, Dict
 from types import SimpleNamespace
 
 import numpy as np
 
 from AnyQt.QtCore import Qt, QRectF, QSizeF, QSize, pyqtSignal as Signal
-from AnyQt.QtGui import QColor, QPen, QBrush, QPainter, QLinearGradient, QFont
+from AnyQt.QtGui import QColor, QPen, QBrush, QPainter, QLinearGradient, \
+    QFont, QFontMetrics
 from AnyQt.QtWidgets import QGraphicsItemGroup, QGraphicsLineItem, \
     QGraphicsScene, QGraphicsWidget, QGraphicsGridLayout, \
     QGraphicsEllipseItem, QGraphicsSimpleTextItem, QSizePolicy, \
     QGraphicsRectItem, QGraphicsSceneMouseEvent
 
-import pyqtgraph as pg
+from orangewidget.utils.visual_settings_dlg import VisualSettingsDialog
 
 from Orange.base import Model
 from Orange.data import Table, Domain, ContinuousVariable, StringVariable
@@ -24,6 +25,9 @@ from Orange.widgets.utils.sql import check_sql_input
 from Orange.widgets.utils.state_summary import format_summary_details
 from Orange.widgets.utils.stickygraphicsview import StickyGraphicsView
 from Orange.widgets.utils.widgetpreview import WidgetPreview
+from Orange.widgets.visualize.utils.customizableplot import \
+    CommonParameterSetter, Updater
+from Orange.widgets.visualize.utils.plotutils import AxisItem
 from Orange.widgets.widget import Input, Output, OWWidget, Msg
 
 from orangecontrib.explain.explainer import \
@@ -53,100 +57,145 @@ def run(data: Table, model: Model, state: TaskState) -> Results:
 
 
 class Legend(QGraphicsWidget):
-    WIDTH = 30
     BAR_WIDTH = 7
+    BAR_HEIGHT = 150
+    FONT_SIZE = 11
 
     def __init__(self, parent):
         super().__init__(parent)
         self.__offset = 2
         self.__group = QGraphicsItemGroup(self)
-        self.__bar_height = ViolinItem.HEIGHT * 3
         self._add_bar()
         self._add_high_label()
         self._add_low_label()
         self._add_feature_label()
+        font = self.font()
+        font.setPointSize(self.FONT_SIZE)
+        self.set_font(font)
 
     def _add_bar(self):
-        item = QGraphicsRectItem(0, 0, self.BAR_WIDTH, self.__bar_height)
-        gradient = QLinearGradient(0, 0, 0, self.__bar_height)
-        gradient.setColorAt(0, QColor(*RGB_HIGH))
-        gradient.setColorAt(1, QColor(*RGB_LOW))
-        item.setPen(QPen(Qt.NoPen))
-        item.setBrush(gradient)
-        self.__group.addToGroup(item)
+        self._bar_item = QGraphicsRectItem()
+        self._bar_item.setPen(QPen(Qt.NoPen))
+        self._set_bar(self.BAR_HEIGHT)
+        self.__group.addToGroup(self._bar_item)
 
     def _add_high_label(self):
-        font = self.font()
-        font.setPixelSize(9)
-        item = QGraphicsSimpleTextItem("High")
-        item.setFont(font)
+        self.__high_label = item = QGraphicsSimpleTextItem("High")
         item.setX(self.BAR_WIDTH + self.__offset)
         item.setY(0)
         self.__group.addToGroup(item)
 
     def _add_low_label(self):
-        font = self.font()
-        font.setPixelSize(9)
-        item = QGraphicsSimpleTextItem("Low")
-        item.setFont(font)
+        self.__low_label = item = QGraphicsSimpleTextItem("Low")
         item.setX(self.BAR_WIDTH + self.__offset)
-        item.setY(self.__bar_height - item.boundingRect().height())
         self.__group.addToGroup(item)
 
     def _add_feature_label(self):
-        font = self.font()
-        font.setPixelSize(11)
-        item = QGraphicsSimpleTextItem("Feature value")
+        self.__feature_label = item = QGraphicsSimpleTextItem("Feature value")
         item.setRotation(-90)
-        item.setFont(font)
         item.setX(self.BAR_WIDTH + self.__offset * 2)
-        item.setY(self.__bar_height / 2 + item.boundingRect().width() / 2)
         self.__group.addToGroup(item)
 
+    def _set_font(self):
+        for label in (self.__high_label,
+                      self.__low_label,
+                      self.__feature_label):
+            label.setFont(self.font())
+
+        bar_height = self._bar_item.boundingRect().height()
+
+        height = self.__low_label.boundingRect().height()
+        self.__low_label.setY(bar_height - height)
+
+        width = self.__feature_label.boundingRect().width()
+        self.__feature_label.setY(bar_height / 2 + width / 2)
+
+    def set_font(self, font: QFont):
+        self.setFont(font)
+        self._set_font()
+
+    def _set_bar(self, height: int):
+        self._bar_item.setRect(0, 0, self.BAR_WIDTH, height)
+        gradient = QLinearGradient(0, 0, 0, height)
+        gradient.setColorAt(0, QColor(*RGB_HIGH))
+        gradient.setColorAt(1, QColor(*RGB_LOW))
+        self._bar_item.setBrush(gradient)
+
+    def set_bar(self, height: int):
+        self._set_bar(height)
+        self._set_font()
+
     def sizeHint(self, *_):
-        return QSizeF(self.WIDTH, ViolinItem.HEIGHT)
+        width = self.__high_label.boundingRect().width()
+        width += self._bar_item.boundingRect().width() + self.__offset
+        return QSizeF(width, ViolinItem.HEIGHT)
 
 
 class VariableItem(QGraphicsItemGroup):
-    MAX_ATTR_LEN = 20
+    MAX_ATTR_LEN = 25
+    MAX_LABEL_LEN = 150
 
     def __init__(self, parent, label: str):
-        self.__font = QFont()
-        self.__name_item: QGraphicsSimpleTextItem = None
-        self.__value_item: QGraphicsSimpleTextItem = None
+        self.__name: str = None
+        self.__value: Optional[str] = None
+        self.__name_item = QGraphicsSimpleTextItem()
+        self.__value_item = QGraphicsSimpleTextItem()
+        self.__max_len = self.MAX_LABEL_LEN
         super().__init__(parent)
         self._set_data(label)
 
+    @property
+    def items(self):
+        return self.__name_item, self.__value_item
+
+    def boundingRect(self):
+        name_br = self.__name_item.boundingRect()
+        width = name_br.width()
+        height = name_br.height()
+        if self.__value_item is not None:
+            value_br = self.__value_item.boundingRect()
+            width = max(width, value_br.width())
+            height += value_br.height()
+        return QRectF(-width, 0, width, height)
+
+    def updateGeometry(self):
+        self.__elide()
+        self.__align_center()
+        self.__align_right()
+
+    def set_max_len(self, length: int):
+        self.__max_len = length
+        self.updateGeometry()
+
     def _set_data(self, label: str):
         split = label.split("=")
-        text = split[0]
-        self.__name_item = QGraphicsSimpleTextItem(self.__elide(text))
-        self.__name_item.setToolTip(text)
-        self.__align_right()
+        self.__name = split[0]
+        self.__name_item.setToolTip(self.__name)
+        self.updateGeometry()  # align before adding to group
         self.addToGroup(self.__name_item)
         if len(split) > 1:
-            text = split[1]
-            self.__value_item = QGraphicsSimpleTextItem(self.__elide(text))
-            self.__value_item.setToolTip(text)
-            self.__align_center()
-            self.__align_right()
+            self.__value = split[1]
+            self.__value_item.setToolTip(self.__value)
+            self.updateGeometry()  # align before adding to group
             self.addToGroup(self.__value_item)
 
+    def __elide(self):
+        fm = QFontMetrics(self.__name_item.font())
+        text = fm.elidedText(self.__name, Qt.ElideRight, self.__max_len)
+        self.__name_item.setText(text)
+        if self.__value is not None:
+            fm = QFontMetrics(self.__value_item.font())
+            text = fm.elidedText(self.__value, Qt.ElideRight, self.__max_len)
+            self.__value_item.setText(text)
+
     def __align_center(self):
-        if self.__value_item is None:
-            return
-        self.__value_item.setY(self.__name_item.boundingRect().height())
+        if self.__value is not None:
+            self.__value_item.setY(self.__name_item.boundingRect().height())
 
     def __align_right(self):
         self.__name_item.setX(-self.__name_item.boundingRect().width())
-        if self.__value_item is None:
-            return
-        self.__value_item.setX(-self.__value_item.boundingRect().width())
-
-    @staticmethod
-    def __elide(text: str) -> str:
-        return f"{text[:VariableItem.MAX_ATTR_LEN - 1]}..." \
-            if len(text) > VariableItem.MAX_ATTR_LEN else text
+        if self.__value is not None:
+            self.__value_item.setX(-self.__value_item.boundingRect().width())
 
 
 class ViolinItem(QGraphicsWidget):
@@ -313,21 +362,113 @@ class ViolinItem(QGraphicsWidget):
         event.accept()
 
 
+class ParameterSetter(CommonParameterSetter):
+    VAR_LABEL = "Variable name"
+    VAL_LABEL = "Variable value"
+    LABEL_LENGTH = "Label length"
+    LEGEND_HEIGHT = "Legend height"
+
+    def __init__(self, parent):
+        self.value_label_font = QFont()
+        self.label_len_setting = {
+            self.LABEL_LENGTH: VariableItem.MAX_LABEL_LEN
+        }
+        super().__init__()
+        self.master: ViolinPlot = parent
+
+    def update_setters(self):
+        def _update_labels(font, index):
+            for item in self.labels:
+                var_items = item.item
+                text_item = var_items.items[index]
+                if text_item is not None:
+                    text_item.setFont(font)
+                    var_items.updateGeometry()
+                    item.updateGeometry()
+            self.master.set_vertical_line()
+
+        def update_name_label(**settings):
+            self.label_font = Updater.change_font(self.label_font, settings)
+            _update_labels(self.label_font, 0)
+
+        def update_value_label(**settings):
+            self.value_label_font = \
+                Updater.change_font(self.value_label_font, settings)
+            _update_labels(self.value_label_font, 1)
+
+        def update_label_len(**settings):
+            self.label_len_setting.update(settings)
+            max_len = self.label_len_setting[self.LABEL_LENGTH]
+            for item in self.labels:
+                var_items: VariableItem = item.item
+                var_items.set_max_len(max_len)
+                item.updateGeometry()
+            self.master.resized.emit()
+
+        def update_legend(**settings):
+            font = Updater.change_font(self.legend.font(), settings)
+            self.legend.set_font(font)
+
+        def update_legend_bar(**settings):
+            self.legend.set_bar(settings[self.LEGEND_HEIGHT])
+
+        self.initial_settings = {
+            self.LABELS_BOX: {
+                self.FONT_FAMILY_LABEL: self.FONT_FAMILY_SETTING,
+                self.VAR_LABEL: self.FONT_SETTING,
+                self.VAL_LABEL: self.FONT_SETTING,
+                self.AXIS_TITLE_LABEL: self.FONT_SETTING,
+                self.AXIS_TICKS_LABEL: self.FONT_SETTING,
+                self.LEGEND_LABEL: self.FONT_SETTING,
+            },
+            self.PLOT_BOX: {
+                self.LABEL_LENGTH: {
+                    self.LABEL_LENGTH: (range(0, 500, 5),
+                                        VariableItem.MAX_LABEL_LEN)
+                },
+                self.LEGEND_HEIGHT: {
+                    self.LEGEND_HEIGHT: (range(100, 500, 5), Legend.BAR_HEIGHT)
+                }
+            }
+        }
+
+        self._setters[self.LABELS_BOX][self.VAR_LABEL] = update_name_label
+        self._setters[self.LABELS_BOX][self.VAL_LABEL] = update_value_label
+        self._setters[self.LABELS_BOX][self.LEGEND_LABEL] = update_legend
+        self._setters[self.PLOT_BOX] = {
+            self.LABEL_LENGTH: update_label_len,
+            self.LEGEND_HEIGHT: update_legend_bar,
+        }
+
+    @property
+    def axis_items(self) -> List[AxisItem]:
+        return [self.master.bottom_axis]
+
+    @property
+    def legend(self) -> Legend:
+        return self.master.legend
+
+    @property
+    def labels(self) -> List[SimpleLayoutItem]:
+        return self.master.labels
+
+
 class ViolinPlot(QGraphicsWidget):
     LABEL_COLUMN, VIOLIN_COLUMN, LEGEND_COLUMN = range(3)
-    VIOLIN_COLUMN_WIDTH, OFFSET = 300, 250
+    VIOLIN_COLUMN_WIDTH, OFFSET = 300, 80
     MAX_N_ITEMS = 100
-    MAX_ATTR_LEN = 20
     selection_cleared = Signal()
     selection_changed = Signal(float, float, str)
+    resized = Signal()
 
     def __init__(self):
         super().__init__()
         self.__violin_column_width = self.VIOLIN_COLUMN_WIDTH  # type: int
         self.__range = None  # type: Optional[Tuple[float, float]]
         self.__violin_items = []  # type: List[ViolinItem]
-        self.__bottom_axis = pg.AxisItem(parent=self, orientation="bottom",
-                                         maxTickLength=7, pen=QPen(Qt.black))
+        self.__variable_items = []  # type: List[VariableItem]
+        self.__bottom_axis = AxisItem(parent=self, orientation="bottom",
+                                      maxTickLength=7, pen=QPen(Qt.black))
         self.__bottom_axis.setLabel("Impact on model output")
         self.__vertical_line = QGraphicsLineItem(self.__bottom_axis)
         self.__vertical_line.setPen(QPen(Qt.gray))
@@ -338,18 +479,31 @@ class ViolinPlot(QGraphicsWidget):
         self.__layout.setVerticalSpacing(0)
         self.setLayout(self.__layout)
 
+        self.parameter_setter = ParameterSetter(self)
+
     @property
     def violin_column_width(self):
         return self.__violin_column_width
 
     @violin_column_width.setter
     def violin_column_width(self, view_width: int):
-        self.__violin_column_width = max(self.VIOLIN_COLUMN_WIDTH,
-                                         view_width - self.OFFSET)
+        j = ViolinPlot.LABEL_COLUMN
+        w = max([self.__layout.itemAt(i, j).item.boundingRect().width()
+                 for i in range(len(self.__violin_items))] + [0])
+        width = view_width - self.legend.sizeHint().width() - self.OFFSET - w
+        self.__violin_column_width = max(self.VIOLIN_COLUMN_WIDTH, width)
 
     @property
     def bottom_axis(self):
         return self.__bottom_axis
+
+    @property
+    def labels(self):
+        return self.__variable_items
+
+    @property
+    def legend(self):
+        return self.__legend
 
     def set_data(self, x: np.ndarray, colors: np.ndarray,
                  names: List[str], n_attrs: float, view_width: int):
@@ -359,7 +513,6 @@ class ViolinPlot(QGraphicsWidget):
         self._set_violin_items(x, colors, names)
         self._set_labels(names)
         self._set_bottom_axis()
-        self._set_vertical_line()
         self.set_n_visible(n_attrs)
 
     def set_n_visible(self, n: int):
@@ -368,10 +521,7 @@ class ViolinPlot(QGraphicsWidget):
             violin_item.setVisible(i < n)
             text_item = self.__layout.itemAt(i, ViolinPlot.LABEL_COLUMN).item
             text_item.setVisible(i < n)
-
-        x = self.__vertical_line.line().x1()
-        n = min(n, len(self.__violin_items))
-        self.__vertical_line.setLine(x, 0, x, -ViolinItem.HEIGHT * n)
+        self.set_vertical_line()
 
     def rescale(self, view_width: int):
         self.violin_column_width = view_width
@@ -409,6 +559,7 @@ class ViolinPlot(QGraphicsWidget):
             item.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
             self.__layout.addItem(item, i, ViolinPlot.LABEL_COLUMN,
                                   Qt.AlignRight | Qt.AlignVCenter)
+            self.__variable_items.append(item)
 
     def _set_bottom_axis(self):
         self.__bottom_axis.setRange(*self.__range)
@@ -416,10 +567,16 @@ class ViolinPlot(QGraphicsWidget):
                               len(self.__violin_items),
                               ViolinPlot.VIOLIN_COLUMN)
 
-    def _set_vertical_line(self):
+    def set_vertical_line(self):
         x = self.violin_column_width / 2
-        n = len(self.__violin_items)
-        self.__vertical_line.setLine(x, 0, x, -ViolinItem.HEIGHT * n)
+        height = 0
+        for i in range(len(self.__violin_items)):
+            violin_item = self.__layout.itemAt(i, ViolinPlot.VIOLIN_COLUMN)
+            text_item = self.__layout.itemAt(i, ViolinPlot.LABEL_COLUMN).item
+            if violin_item.isVisible():
+                height += max(text_item.boundingRect().height(),
+                              violin_item.preferredSize().height())
+        self.__vertical_line.setLine(x, 0, x, -height)
 
     def deselect(self):
         self.selection_cleared.emit()
@@ -434,6 +591,10 @@ class ViolinPlot(QGraphicsWidget):
                 item.add_selection_rect(x1 - point_r_diff, x2 + point_r_diff)
                 break
         self.select(x1, x2, attr_name)
+
+    def apply_visual_settings(self, settings: Dict):
+        for key, value in settings.items():
+            self.parameter_setter.set_parameter(key, value)
 
 
 class GraphicsScene(QGraphicsScene):
@@ -484,6 +645,7 @@ class OWExplainModel(OWWidget, ConcurrentWidgetMixin):
     show_legend = Setting(True)
     selection = Setting((), schema_only=True)  # type: Tuple[str, List[int]]
     auto_send = Setting(True)
+    visual_settings = Setting({}, schema_only=True)
 
     graph_name = "scene"
 
@@ -496,6 +658,9 @@ class OWExplainModel(OWWidget, ConcurrentWidgetMixin):
         self._violin_plot = None  # type: Optional[ViolinPlot]
         self.setup_gui()
         self.__pending_selection = self.selection
+
+        initial = ViolinPlot().parameter_setter.initial_settings
+        VisualSettingsDialog(self, initial)
 
     def setup_gui(self):
         self._add_controls()
@@ -624,13 +789,16 @@ class OWExplainModel(OWWidget, ConcurrentWidgetMixin):
         self._violin_plot = ViolinPlot()
         self._violin_plot.set_data(x, colors, names, self.n_attributes, width)
         self._violin_plot.show_legend(self.show_legend)
+        self._violin_plot.apply_visual_settings(self.visual_settings)
         self._violin_plot.selection_cleared.connect(self.clear_selection)
         self._violin_plot.selection_changed.connect(self.update_selection)
         self._violin_plot.layout().activate()
         self._violin_plot.geometryChanged.connect(self.update_scene_rect)
+        self._violin_plot.resized.connect(self.update_plot)
         self.scene.addItem(self._violin_plot)
         self.scene.mouse_clicked.connect(self._violin_plot.deselect)
         self.update_scene_rect()
+        self.update_plot()
 
     def update_plot(self):
         if self._violin_plot is not None:
@@ -726,6 +894,11 @@ class OWExplainModel(OWWidget, ConcurrentWidgetMixin):
             items["Target class"] = class_var.values[self.target_index]
         self.report_items(items)
         self.report_plot()
+
+    def set_visual_settings(self, key, value):
+        self.visual_settings[key] = value
+        if self._violin_plot is not None:
+            self._violin_plot.parameter_setter.set_parameter(key, value)
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -1,4 +1,4 @@
-# pylint: disable=missing-docstring
+# pylint: disable=missing-docstring,protected-access,invalid-name
 import inspect
 import itertools
 import unittest
@@ -6,6 +6,7 @@ import unittest
 import numpy as np
 
 from AnyQt.QtCore import Qt, QPoint
+from AnyQt.QtGui import QFont
 from AnyQt.QtTest import QTest
 from AnyQt.QtWidgets import QGraphicsGridLayout
 
@@ -120,12 +121,13 @@ class TestOWExplainModel(WidgetTest):
         h = plot.layout().itemAt(0, plot.VIOLIN_COLUMN)
         pos = self.widget.view.mapFromScene(h.scenePos())
         QTest.mousePress(self.widget.view.viewport(), Qt.LeftButton,
-                         pos=pos + QPoint(250, 10))
+                         pos=pos + QPoint(0, 10))
         mouseMove(self.widget.view.viewport(), Qt.LeftButton,
                   pos=pos + QPoint(300, 20))
         QTest.mouseRelease(self.widget.view.viewport(), Qt.LeftButton,
                            pos=pos + QPoint(300, 30))
         saved_selection = self.get_output(self.widget.Outputs.selected_data)
+        self.assertIsNotNone(saved_selection)
 
         settings = self.widget.settingsHandler.pack_data(self.widget)
         widget = self.create_widget(OWExplainModel, stored_settings=settings)
@@ -247,6 +249,96 @@ class TestOWExplainModel(WidgetTest):
         self.send_signal(self.widget.Inputs.model, self.rf_reg)
         self.widget.send_report()
 
+    def test_visual_settings(self):
+        font = QFont()
+        font.setItalic(True)
+        font.setFamily("Helvetica")
+
+        self.send_signal(self.widget.Inputs.data, self.iris)
+        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+        self.wait_until_finished()
+        setter = self.widget._violin_plot.parameter_setter
+
+        key, value = ("Fonts", "Font family", "Font family"), "Helvetica"
+        self.widget.set_visual_settings(key, value)
+
+        key, value = ("Fonts", "Axis title", "Font size"), 14
+        self.widget.set_visual_settings(key, value)
+        key, value = ("Fonts", "Axis title", "Italic"), True
+        self.widget.set_visual_settings(key, value)
+        font.setPointSize(14)
+        for axis in setter.axis_items:
+            self.assertFontEqual(axis.label.font(), font)
+
+        key, value = ('Fonts', 'Axis ticks', 'Font size'), 15
+        self.widget.set_visual_settings(key, value)
+        key, value = ('Fonts', 'Axis ticks', 'Italic'), True
+        self.widget.set_visual_settings(key, value)
+        font.setPointSize(15)
+        for axis in setter.axis_items:
+            self.assertFontEqual(axis.style["tickFont"], font)
+
+        key, value = ("Fonts", "Legend", "Font size"), 16
+        self.widget.set_visual_settings(key, value)
+        key, value = ("Fonts", "Legend", "Italic"), True
+        self.widget.set_visual_settings(key, value)
+        font.setPointSize(16)
+        self.assertFontEqual(setter.legend._Legend__high_label.font(), font)
+        self.assertFontEqual(setter.legend._Legend__feature_label.font(), font)
+        self.assertFontEqual(setter.legend._Legend__low_label.font(), font)
+
+        key, value = ("Fonts", "Variable name", "Font size"), 19
+        self.widget.set_visual_settings(key, value)
+        key, value = ("Fonts", "Variable name", "Italic"), True
+        self.widget.set_visual_settings(key, value)
+        font.setPointSize(19)
+        self.assertFontEqual(setter.labels[0].item.items[0].font(), font)
+
+        key, value = ("Fonts", "Variable value", "Font size"), 10
+        self.widget.set_visual_settings(key, value)
+        key, value = ("Fonts", "Variable value", "Italic"), True
+        self.widget.set_visual_settings(key, value)
+        font.setPointSize(10)
+        self.assertFontEqual(setter.labels[0].item.items[1].font(), font)
+
+        key, value = ("Figure", "Label length", "Label length"), 50
+        self.widget.set_visual_settings(key, value)
+        self.assertLessEqual(setter.labels[0].item.boundingRect().width(), 50)
+
+        key, value = ("Figure", "Legend height", "Legend height"), 225
+        self.widget.set_visual_settings(key, value)
+        self.assertEqual(setter.legend._bar_item.boundingRect().height(), 225)
+
+        self.send_signal(self.widget.Inputs.data, None)
+        self.send_signal(self.widget.Inputs.data, self.iris)
+        self.wait_until_finished()
+        setter = self.widget._violin_plot.parameter_setter
+
+        font.setPointSize(14)
+        for axis in setter.axis_items:
+            self.assertFontEqual(axis.label.font(), font)
+
+        font.setPointSize(15)
+        for axis in setter.axis_items:
+            self.assertFontEqual(axis.style["tickFont"], font)
+
+        font.setPointSize(16)
+        self.assertFontEqual(setter.legend._Legend__high_label.font(), font)
+        self.assertFontEqual(setter.legend._Legend__feature_label.font(), font)
+        self.assertFontEqual(setter.legend._Legend__low_label.font(), font)
+
+        font.setPointSize(19)
+        self.assertFontEqual(setter.labels[0].item.items[0].font(), font)
+
+        font.setPointSize(10)
+        self.assertFontEqual(setter.labels[0].item.items[1].font(), font)
+
+        self.assertLessEqual(setter.labels[0].item.boundingRect().width(), 50)
+
+        key, value = ("Figure", "Legend height", "Legend height"), 225
+        self.widget.set_visual_settings(key, value)
+        self.assertEqual(setter.legend._bar_item.boundingRect().height(), 225)
+
     def assertPlotEmpty(self, plot: ViolinPlot):
         self.assertIsNone(plot)
 
@@ -261,6 +353,11 @@ class TestOWExplainModel(WidgetTest):
             self.assertIsInstance(layout.itemAt(i, 1), ViolinItem)
         self.assertIsNone(layout.itemAt(n_rows - 1, 0))
         self.assertIsInstance(layout.itemAt(n_rows - 1, 1), pg.AxisItem)
+
+    def assertFontEqual(self, font1, font2):
+        self.assertEqual(font1.family(), font2.family())
+        self.assertEqual(font1.pointSize(), font2.pointSize())
+        self.assertEqual(font1.italic(), font2.italic())
 
 
 if __name__ == "__main__":
