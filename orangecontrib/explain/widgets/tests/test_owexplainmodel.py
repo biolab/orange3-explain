@@ -7,7 +7,7 @@ import numpy as np
 
 from AnyQt.QtCore import Qt, QPoint
 from AnyQt.QtTest import QTest
-from AnyQt.QtWidgets import QGraphicsGridLayout, QGraphicsSimpleTextItem
+from AnyQt.QtWidgets import QGraphicsGridLayout
 
 import pyqtgraph as pg
 
@@ -22,7 +22,7 @@ from Orange.data import Table, Domain
 from Orange.regression import RandomForestRegressionLearner
 
 from orangecontrib.explain.widgets.owexplainmodel import OWExplainModel, \
-    ViolinPlot, ViolinItem, Results
+    VariableItem, ViolinPlot, ViolinItem, Results
 
 
 def dummy_run(data, model, _):
@@ -257,7 +257,7 @@ class TestOWExplainModel(WidgetTest):
         self.assertEqual(layout.columnCount(), 3)
         for i in range(layout.rowCount() - 1):
             item0 = layout.itemAt(i, 0).item
-            self.assertIsInstance(item0, QGraphicsSimpleTextItem)
+            self.assertIsInstance(item0, VariableItem)
             self.assertIsInstance(layout.itemAt(i, 1), ViolinItem)
         self.assertIsNone(layout.itemAt(n_rows - 1, 0))
         self.assertIsInstance(layout.itemAt(n_rows - 1, 1), pg.AxisItem)

@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from AnyQt.QtCore import Qt, QRectF, QSizeF, QSize, pyqtSignal as Signal
-from AnyQt.QtGui import QColor, QPen, QBrush, QPainter, QLinearGradient
+from AnyQt.QtGui import QColor, QPen, QBrush, QPainter, QLinearGradient, QFont
 from AnyQt.QtWidgets import QGraphicsItemGroup, QGraphicsLineItem, \
     QGraphicsScene, QGraphicsWidget, QGraphicsGridLayout, \
     QGraphicsEllipseItem, QGraphicsSimpleTextItem, QSizePolicy, \
@@ -105,6 +105,48 @@ class Legend(QGraphicsWidget):
 
     def sizeHint(self, *_):
         return QSizeF(self.WIDTH, ViolinItem.HEIGHT)
+
+
+class VariableItem(QGraphicsItemGroup):
+    MAX_ATTR_LEN = 20
+
+    def __init__(self, parent, label: str):
+        self.__font = QFont()
+        self.__name_item: QGraphicsSimpleTextItem = None
+        self.__value_item: QGraphicsSimpleTextItem = None
+        super().__init__(parent)
+        self._set_data(label)
+
+    def _set_data(self, label: str):
+        split = label.split("=")
+        text = split[0]
+        self.__name_item = QGraphicsSimpleTextItem(self.__elide(text))
+        self.__name_item.setToolTip(text)
+        self.__align_right()
+        self.addToGroup(self.__name_item)
+        if len(split) > 1:
+            text = split[1]
+            self.__value_item = QGraphicsSimpleTextItem(self.__elide(text))
+            self.__value_item.setToolTip(text)
+            self.__align_center()
+            self.__align_right()
+            self.addToGroup(self.__value_item)
+
+    def __align_center(self):
+        if self.__value_item is None:
+            return
+        self.__value_item.setY(self.__name_item.boundingRect().height())
+
+    def __align_right(self):
+        self.__name_item.setX(-self.__name_item.boundingRect().width())
+        if self.__value_item is None:
+            return
+        self.__value_item.setX(-self.__value_item.boundingRect().width())
+
+    @staticmethod
+    def __elide(text: str) -> str:
+        return f"{text[:VariableItem.MAX_ATTR_LEN - 1]}..." \
+            if len(text) > VariableItem.MAX_ATTR_LEN else text
 
 
 class ViolinItem(QGraphicsWidget):
@@ -362,10 +404,7 @@ class ViolinPlot(QGraphicsWidget):
 
     def _set_labels(self, labels: List[str]):
         for i, (label, _) in enumerate(zip(labels, self.__violin_items)):
-            short = f"{label[:self.MAX_ATTR_LEN - 1]}..." \
-                if len(label) > self.MAX_ATTR_LEN else label
-            text = QGraphicsSimpleTextItem(short, self)
-            text.setToolTip(label)
+            text = VariableItem(self, label)
             item = SimpleLayoutItem(text)
             item.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
             self.__layout.addItem(item, i, ViolinPlot.LABEL_COLUMN,
