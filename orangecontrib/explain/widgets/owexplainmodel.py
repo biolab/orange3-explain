@@ -149,7 +149,7 @@ class ViolinItem(QGraphicsWidget):
             item.setX(_x)
             item.setY(_y)
             item.setRect(0, 0, self.POINT_R, self.POINT_R)
-            color = QColor(*colors.pop())
+            color = QColor(*colors.pop().astype(int))
             item.setPen(QPen(color))
             item.setBrush(QBrush(color))
             self.__group.addToGroup(item)
