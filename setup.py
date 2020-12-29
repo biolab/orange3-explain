@@ -38,7 +38,7 @@ DATA_FILES = [
 ]
 
 INSTALL_REQUIRES = [
-    "Orange3",
+    "Orange3 >= 3.27.1",
     "AnyQt",
     "numpy",
     "pyqtgraph",
