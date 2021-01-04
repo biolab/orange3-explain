@@ -134,12 +134,16 @@ class Legend(QGraphicsWidget):
 class VariableItem(QGraphicsItemGroup):
     MAX_ATTR_LEN = 25
     MAX_LABEL_LEN = 150
+    VALUE_FONT_SETTING = {Updater.SIZE_LABEL: 12,
+                          Updater.IS_ITALIC_LABEL: True}
 
     def __init__(self, parent, label: str):
         self.__name: str = None
         self.__value: Optional[str] = None
         self.__name_item = QGraphicsSimpleTextItem()
         self.__value_item = QGraphicsSimpleTextItem()
+        font = Updater.change_font(QFont(), self.VALUE_FONT_SETTING)
+        self.__value_item.setFont(font)
         self.__max_len = self.MAX_LABEL_LEN
         super().__init__(parent)
         self._set_data(label)
@@ -369,7 +373,9 @@ class ParameterSetter(CommonParameterSetter):
     LEGEND_HEIGHT = "Legend height"
 
     def __init__(self, parent):
-        self.value_label_font = QFont()
+        self.value_label_font = Updater.change_font(
+            QFont(), VariableItem.VALUE_FONT_SETTING
+        )
         self.label_len_setting = {
             self.LABEL_LENGTH: VariableItem.MAX_LABEL_LEN
         }
@@ -412,11 +418,17 @@ class ParameterSetter(CommonParameterSetter):
         def update_legend_bar(**settings):
             self.legend.set_bar(settings[self.LEGEND_HEIGHT])
 
+        font_size = VariableItem.VALUE_FONT_SETTING[Updater.SIZE_LABEL]
+        is_italic = VariableItem.VALUE_FONT_SETTING[Updater.IS_ITALIC_LABEL]
+        value_font_setting = {
+            Updater.SIZE_LABEL: (range(4, 50), font_size),
+            Updater.IS_ITALIC_LABEL: (None, is_italic)
+        }
         self.initial_settings = {
             self.LABELS_BOX: {
                 self.FONT_FAMILY_LABEL: self.FONT_FAMILY_SETTING,
                 self.VAR_LABEL: self.FONT_SETTING,
-                self.VAL_LABEL: self.FONT_SETTING,
+                self.VAL_LABEL: value_font_setting,
                 self.AXIS_TITLE_LABEL: self.FONT_SETTING,
                 self.AXIS_TICKS_LABEL: self.FONT_SETTING,
                 self.LEGEND_LABEL: self.FONT_SETTING,
