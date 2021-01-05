@@ -1,6 +1,8 @@
+import inspect
 import unittest
 
 import numpy as np
+import pkg_resources
 
 from Orange.classification import (
     LogisticRegressionLearner,
@@ -8,11 +10,11 @@ from Orange.classification import (
     SGDClassificationLearner,
     SVMLearner,
     TreeLearner,
+    ThresholdLearner,
 )
 from Orange.data import Table, Domain
 from Orange.regression import LinearRegressionLearner
-from Orange.tests.test_classification import LearnerAccessibility
-from Orange.tests import test_regression
+from Orange.tests import test_regression, test_classification
 from Orange.widgets.data import owcolor
 from orangecontrib.explain.explainer import (
     compute_colors,
@@ -159,12 +161,17 @@ class TestExplainer(unittest.TestCase):
         # missing class has all shap values 0
         self.assertTrue(not np.any(shap_values[2].sum()))
 
-    @unittest.skip("Enable when learners fixed")
     def test_all_classifiers(self):
         """ Test explanation for all classifiers """
-        for learner in LearnerAccessibility.all_learners(None):
+        for learner in test_classification.all_learners():
             with self.subTest(learner.name):
-                model = learner(self.iris)
+                if learner == ThresholdLearner:
+                    # ThresholdLearner require binary class
+                    continue
+                kwargs = {}
+                if "base_learner" in inspect.signature(learner).parameters:
+                    kwargs = {"base_learner": LogisticRegressionLearner()}
+                model = learner(**kwargs)(self.iris)
                 shap_values, _, _, _ = compute_shap_values(
                     model, self.iris, self.iris
                 )
@@ -176,7 +183,7 @@ class TestExplainer(unittest.TestCase):
 
     @unittest.skipIf(
         not hasattr(test_regression, "all_learners"),
-        "all_learners not available in Orange < 3.26"
+        "all_learners not available in Orange < 3.26",
     )
     def test_all_regressors(self):
         """ Test explanation for all regressors """
@@ -568,6 +575,16 @@ class TestExplainer(unittest.TestCase):
 
         self.assertTupleEqual(self.iris.X.shape, shap_values[0].shape)
         self.assertTupleEqual((len(self.iris),), sample_mask.shape)
+
+    def test_remove_calibration_workaround(self):
+        """
+        When this test start to fail remove the workaround in
+        explainer.py-207:220 if allready fixed - revert the pullrequest
+        that adds those lines.
+        """
+        self.assertGreater(
+            "3.29.0", pkg_resources.get_distribution("orange3").version
+        )
 
 
 if __name__ == "__main__":
