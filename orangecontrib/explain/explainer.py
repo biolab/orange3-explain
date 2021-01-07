@@ -102,9 +102,7 @@ def _explain_trees(
     for i in range(0, len(data_sample), batch_size):
         progress_callback(i / len(data_sample))
         batch = data_sample.X[i : i + batch_size]
-        shap_values.append(
-            explainer.shap_values(batch, check_additivity=False)
-        )
+        shap_values.append(explainer.shap_values(batch, check_additivity=False))
 
     shap_values = _join_shap_values(shap_values)
     base_value = explainer.expected_value
@@ -152,7 +150,9 @@ def _explain_other_models(
     for i, row in enumerate(data_sample.X):
         progress_callback(i / len(data_sample))
         shap_values.append(
-            explainer.shap_values(row, nsamples=100, silent=True, l1_reg="num_features(90)")
+            explainer.shap_values(
+                row, nsamples=100, silent=True, l1_reg="num_features(90)"
+            )
         )
     return (
         _join_shap_values(shap_values),
@@ -205,8 +205,24 @@ def compute_shap_values(
             progress_callback = dummy_callback
         progress_callback(0, "Computing explanation ...")
 
-        data_transformed = model.data_to_model_domain(data)
-        reference_data_transformed = model.data_to_model_domain(reference_data)
+        #### workaround for bug with calibration
+        #### remove when fixed
+        from Orange.classification import (
+            ThresholdClassifier,
+            CalibratedClassifier,
+        )
+
+        trans_model = model
+        while isinstance(
+            trans_model, (ThresholdClassifier, CalibratedClassifier)
+        ):
+            trans_model = trans_model.base_model
+        #### end of workaround for bug with calibration
+
+        data_transformed = trans_model.data_to_model_domain(data)
+        reference_data_transformed = trans_model.data_to_model_domain(
+            reference_data
+        )
 
         shap_values, sample_mask, base_value = _explain_trees(
             model,
@@ -422,7 +438,8 @@ def explain_predictions(
         Domain(data.domain.attributes, None, data.domain.metas)
     )
     predictions = model(
-        classless_data, model.Probs if model.domain.class_var.is_discrete else model.Value
+        classless_data,
+        model.Probs if model.domain.class_var.is_discrete else model.Value,
     )
     # for regression - predictions array is 1d transform it shape N x 1
     if predictions.ndim == 1:
