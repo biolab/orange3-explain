@@ -358,7 +358,7 @@ class StripeItem(QGraphicsWidget):
             y_delta = height * item.norm_value * diff
 
             y_text = y + y_delta / 2 - item.value_height / 2
-            visible = y_delta > item.value_height + 8
+            visible = bool(y_delta > item.value_height + 8)
 
             y_test_adj = y_text + adjust_y(i)
             y_mid = height * (self.__range[1] - self.__model_output)
