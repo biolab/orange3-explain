@@ -172,6 +172,31 @@ class TestOWExplainPrediction(WidgetTest):
         self.send_signal(self.widget.Inputs.data, None)
         self.assertFalse(self.widget.Information.multiple_instances.is_shown())
 
+    def test_mouse_wheel_zoom_changed(self):
+        self.send_signal(self.widget.Inputs.data, self.iris[:1])
+        self.send_signal(self.widget.Inputs.background_data, self.iris)
+        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+        self.wait_until_finished()
+
+        self.assertEqual(self.widget._stripe_plot.height, 500)
+        self.assertEqual(self.widget._size_slider.value(), 10)
+        self.assertEqual(self.widget.stripe_len, 10)
+
+        self.widget.view.zoomChanged.emit(10)
+        self.assertEqual(self.widget._stripe_plot.height, 600)
+        self.assertEqual(self.widget._size_slider.value(), 20)
+        self.assertEqual(self.widget.stripe_len, 20)
+
+        self.widget.view.zoomChanged.emit(-30)
+        self.assertEqual(self.widget._stripe_plot.height, 410)
+        self.assertEqual(self.widget._size_slider.value(), 1)
+        self.assertEqual(self.widget.stripe_len, 1)
+
+        self.widget.view.zoomChanged.emit(1000)
+        self.assertEqual(self.widget._stripe_plot.height, 5400)
+        self.assertEqual(self.widget._size_slider.value(), 500)
+        self.assertEqual(self.widget.stripe_len, 500)
+
     def test_send_report(self):
         self.widget.send_report()
         self.send_signal(self.widget.Inputs.data, self.iris[:1])

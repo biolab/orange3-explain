@@ -3,8 +3,9 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from AnyQt.QtCore import Qt, QRectF, QSizeF, QSize, QPointF
-from AnyQt.QtGui import QColor, QPen, QBrush, QPainter, QPainterPath, QPolygonF
+from AnyQt.QtCore import Qt, QRectF, QSizeF, QSize, QPointF, Signal
+from AnyQt.QtGui import QColor, QPen, QBrush, QPainter, QPainterPath, \
+    QPolygonF, QWheelEvent
 from AnyQt.QtWidgets import QGraphicsItemGroup, QGraphicsLineItem, \
     QGraphicsScene, QGraphicsWidget, QGraphicsLinearLayout, QGraphicsView, \
     QGraphicsSimpleTextItem, QGraphicsRectItem, QGraphicsPathItem, \
@@ -465,6 +466,19 @@ class StripePlot(QGraphicsWidget):
                       self.height + self.VMARGIN * 2)
 
 
+class GraphicsView(QGraphicsView):
+    zoomChanged = Signal(float)
+
+    def wheelEvent(self, event: QWheelEvent):
+        if event.modifiers() & Qt.ControlModifier \
+                and event.buttons() == Qt.NoButton:
+            self.zoomChanged.emit(event.angleDelta().y())
+            event.accept()
+        else:
+            super().wheelEvent(event)
+
+
+
 class OWExplainPrediction(OWWidget, ConcurrentWidgetMixin):
     name = "Explain Prediction"
     description = "Prediction explanation widget."
@@ -516,7 +530,8 @@ class OWExplainPrediction(OWWidget, ConcurrentWidgetMixin):
 
     def _add_plot(self):
         self.scene = QGraphicsScene()
-        self.view = QGraphicsView(self.scene)
+        self.view = GraphicsView(self.scene)
+        self.view.zoomChanged.connect(self.__zoom_changed)
         self.view.setRenderHint(QPainter.Antialiasing, True)
         self.view.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         self.mainArea.layout().addWidget(self.view)
@@ -528,8 +543,10 @@ class OWExplainPrediction(OWWidget, ConcurrentWidgetMixin):
                                           contentsLength=12)
 
         box = gui.hBox(self.controlArea, "Zoom")
-        gui.hSlider(box, self, "stripe_len", None, minValue=1, maxValue=500,
-                    createLabel=False, callback=self.__size_slider_changed)
+        self._size_slider = gui.hSlider(
+            box, self, "stripe_len", None, minValue=1, maxValue=500,
+            createLabel=False, callback=self.__size_slider_changed
+        )
 
         gui.rubber(self.controlArea)
 
@@ -544,6 +561,13 @@ class OWExplainPrediction(OWWidget, ConcurrentWidgetMixin):
     def __size_slider_changed(self):
         if self._stripe_plot is not None:
             self._stripe_plot.set_height(self.stripe_len)
+
+    def __zoom_changed(self, delta: float):
+        self.stripe_len = max(min(self.stripe_len + delta,
+                                  self._size_slider.maximum()),
+                              self._size_slider.minimum())
+        self._size_slider.setValue(self.stripe_len)
+        self.__size_slider_changed()
 
     @Inputs.data
     @check_sql_input
