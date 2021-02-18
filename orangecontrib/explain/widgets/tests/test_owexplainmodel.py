@@ -22,8 +22,9 @@ from Orange.classification import RandomForestLearner, OneClassSVMLearner, \
 from Orange.data import Table, Domain
 from Orange.regression import RandomForestRegressionLearner
 
+from orangecontrib.explain.widgets.owexplainfeaturebase import VariableItem
 from orangecontrib.explain.widgets.owexplainmodel import OWExplainModel, \
-    VariableItem, ViolinPlot, ViolinItem, Results
+    ViolinPlot, ViolinItem, Results
 
 
 def dummy_run(data, model, _):
@@ -58,26 +59,26 @@ class TestOWExplainModel(WidgetTest):
         self.send_signal(self.widget.Inputs.data, self.iris)
         self.send_signal(self.widget.Inputs.model, self.rf_cls)
         self.wait_until_finished()
-        self.assertDomainInPlot(self.widget._violin_plot, self.iris.domain)
+        self.assertDomainInPlot(self.widget.plot, self.iris.domain)
 
     def test_classification_data_regression_model(self):
         self.send_signal(self.widget.Inputs.data, self.iris)
         self.send_signal(self.widget.Inputs.model, self.rf_reg)
         self.wait_until_finished()
-        self.assertPlotEmpty(self.widget._violin_plot)
+        self.assertPlotEmpty(self.widget.plot)
         self.assertTrue(self.widget.Error.domain_transform_err.is_shown())
 
     def test_regression_data_regression_model(self):
         self.send_signal(self.widget.Inputs.data, self.housing)
         self.send_signal(self.widget.Inputs.model, self.rf_reg)
         self.wait_until_finished()
-        self.assertDomainInPlot(self.widget._violin_plot, self.housing.domain)
+        self.assertDomainInPlot(self.widget.plot, self.housing.domain)
 
     def test_regression_data_classification_model(self):
         self.send_signal(self.widget.Inputs.data, self.housing)
         self.send_signal(self.widget.Inputs.model, self.rf_cls)
         self.wait_until_finished()
-        self.assertPlotEmpty(self.widget._violin_plot)
+        self.assertPlotEmpty(self.widget.plot)
         self.assertTrue(self.widget.Error.domain_transform_err.is_shown())
 
     def test_output_scores(self):
@@ -95,8 +96,8 @@ class TestOWExplainModel(WidgetTest):
         self.send_signal(self.widget.Inputs.data, self.iris)
         self.send_signal(self.widget.Inputs.model, self.rf_cls)
         self.wait_until_finished()
-        plot = self.widget._violin_plot
-        h = plot.layout().itemAt(0, plot.VIOLIN_COLUMN)
+        plot = self.widget.plot
+        h = plot.layout().itemAt(0, plot.ITEM_COLUMN)
         pos = self.widget.view.mapFromScene(h.scenePos())
         QTest.mousePress(self.widget.view.viewport(), Qt.LeftButton,
                          pos=pos + QPoint(1, 1))
@@ -117,8 +118,8 @@ class TestOWExplainModel(WidgetTest):
         rf_cls = RandomForestLearner(random_state=42)(self.heart)
         self.send_signal(self.widget.Inputs.model, rf_cls)
         self.wait_until_finished()
-        plot = self.widget._violin_plot
-        h = plot.layout().itemAt(0, plot.VIOLIN_COLUMN)
+        plot = self.widget.plot
+        h = plot.layout().itemAt(0, plot.ITEM_COLUMN)
         pos = self.widget.view.mapFromScene(h.scenePos())
         QTest.mousePress(self.widget.view.viewport(), Qt.LeftButton,
                          pos=pos + QPoint(0, 10))
@@ -197,31 +198,32 @@ class TestOWExplainModel(WidgetTest):
 
     def test_plot(self):
         self.send_signal(self.widget.Inputs.data, self.iris)
-        self.assertPlotEmpty(self.widget._violin_plot)
+        self.assertPlotEmpty(self.widget.plot)
 
         self.send_signal(self.widget.Inputs.model, self.rf_cls)
         self.wait_until_finished()
-        self.assertDomainInPlot(self.widget._violin_plot, self.iris.domain)
+        self.assertDomainInPlot(self.widget.plot, self.iris.domain)
 
         self.send_signal(self.widget.Inputs.model, None)
-        self.assertPlotEmpty(self.widget._violin_plot)
+        self.assertPlotEmpty(self.widget.plot)
 
         self.send_signal(self.widget.Inputs.model, self.rf_reg)
         self.wait_until_finished()
-        self.assertPlotEmpty(self.widget._violin_plot)
+        self.assertPlotEmpty(self.widget.plot)
 
         self.send_signal(self.widget.Inputs.data, self.iris)
         self.wait_until_finished()
-        self.assertPlotEmpty(self.widget._violin_plot)
+        self.assertPlotEmpty(self.widget.plot)
 
         self.send_signal(self.widget.Inputs.model, self.rf_cls)
         self.wait_until_finished()
-        self.assertDomainInPlot(self.widget._violin_plot, self.iris.domain)
+        self.assertDomainInPlot(self.widget.plot, self.iris.domain)
 
         self.send_signal(self.widget.Inputs.data, None)
-        self.assertPlotEmpty(self.widget._violin_plot)
+        self.assertPlotEmpty(self.widget.plot)
 
-    @unittest.mock.patch("orangecontrib.explain.widgets.owexplainmodel.run")
+    @unittest.mock.patch("orangecontrib.explain.widgets.owexplainmodel."
+                         "OWExplainModel.run")
     def test_data_sampled_info(self, mocked_run):
         mocked_run.side_effect = dummy_run
         self.send_signal(self.widget.Inputs.data, self.iris)
@@ -257,7 +259,7 @@ class TestOWExplainModel(WidgetTest):
         self.send_signal(self.widget.Inputs.data, self.iris)
         self.send_signal(self.widget.Inputs.model, self.rf_cls)
         self.wait_until_finished()
-        setter = self.widget._violin_plot.parameter_setter
+        setter = self.widget.plot.parameter_setter
 
         key, value = ("Fonts", "Font family", "Font family"), "Helvetica"
         self.widget.set_visual_settings(key, value)
@@ -312,7 +314,7 @@ class TestOWExplainModel(WidgetTest):
         self.send_signal(self.widget.Inputs.data, None)
         self.send_signal(self.widget.Inputs.data, self.iris)
         self.wait_until_finished()
-        setter = self.widget._violin_plot.parameter_setter
+        setter = self.widget.plot.parameter_setter
 
         font.setPointSize(14)
         for axis in setter.axis_items:
