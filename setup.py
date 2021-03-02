@@ -48,7 +48,8 @@ INSTALL_REQUIRES = [
 ]
 
 EXTRAS_REQUIRE = {
-    'test': ['pytest', 'coverage']
+    'test': ['pytest', 'coverage'],
+    'doc': ['sphinx', 'recommonmark', 'sphinx_rtd_theme'],
 }
 
 ENTRY_POINTS = {
