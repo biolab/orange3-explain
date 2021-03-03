@@ -30,7 +30,7 @@ KEYWORDS = (
 PACKAGES = find_packages()
 
 PACKAGE_DATA = {
-    "orangecontrib.example.widgets": ["icons/*"],
+    "orangecontrib.explain.widgets": ["icons/*"],
 }
 
 DATA_FILES = [
@@ -90,7 +90,7 @@ def include_documentation(local_dir, install_dir):
 
 
 if __name__ == "__main__":
-    include_documentation("doc/_build/htmlhelp", "help/orange3-example")
+    include_documentation("doc/_build/htmlhelp", "help/orange3-explain")
     setup(
         author=AUTHOR,
         author_email=AUTHOR_EMAIL,
