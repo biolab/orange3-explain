@@ -115,11 +115,12 @@ def _wrap_score(
             pred = model.skl_model.predict(data.X)
             if is_cls:
                 prob = model.skl_model.predict_proba(data.X)
-        elif not needs_preprocessing:
-            pred = model.predict(data.X)
-            if is_cls:
-                assert isinstance(pred, tuple)
-                pred, prob = pred
+        # TODO - unify model.predict() output for all Models
+        # elif not needs_preprocessing:
+        #     pred = model.predict(data.X)
+        #     if is_cls:
+        #         assert isinstance(pred, tuple)
+        #         pred, prob = pred
         else:
             if is_cls:
                 pred, prob = model(data, ret=Model.ValueProbs)
