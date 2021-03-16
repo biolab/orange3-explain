@@ -15,7 +15,8 @@ from Orange.classification import RandomForestLearner
 from Orange.data import Table, Domain, ContinuousVariable, StringVariable
 from Orange.regression import RandomForestRegressionLearner
 from Orange.widgets import gui
-from Orange.widgets.settings import Setting, ContextSetting
+from Orange.widgets.settings import Setting, ContextSetting, \
+    ClassValuesContextHandler
 from Orange.widgets.utils.concurrent import TaskState
 from Orange.widgets.utils.widgetpreview import WidgetPreview
 from Orange.widgets.visualize.utils.customizableplot import Updater
@@ -345,6 +346,7 @@ class OWExplainModel(OWExplainFeatureBase):
         "orangecontrib.prototypes.widgets.owexplainmodel.OWExplainModel"
     ]
 
+    settingsHandler = ClassValuesContextHandler()
     target_index = ContextSetting(0)
     show_legend = Setting(True)
 
@@ -378,6 +380,9 @@ class OWExplainModel(OWExplainFeatureBase):
     def __show_check_changed(self):
         if self.plot is not None:
             self.plot.show_legend(self.show_legend)
+
+    def openContext(self, model: Optional[Model]):
+        super().openContext(model.domain.class_var if model else None)
 
     def setup_controls(self):
         self._target_combo.clear()

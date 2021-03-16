@@ -17,7 +17,8 @@ from Orange.evaluation.scoring import Score
 from Orange.regression import RandomForestRegressionLearner
 from Orange.widgets import gui
 from Orange.widgets.evaluate.utils import BUILTIN_SCORERS_ORDER, usable_scorers
-from Orange.widgets.settings import Setting, ContextSetting
+from Orange.widgets.settings import Setting, ContextSetting, \
+    PerfectDomainContextHandler
 from Orange.widgets.utils.concurrent import TaskState
 from Orange.widgets.utils.widgetpreview import WidgetPreview
 
@@ -240,6 +241,7 @@ class OWPermutationImportance(OWExplainFeatureBase):
     icon = "icons/PermutationImportance.svg"
     priority = 50
 
+    settingsHandler = PerfectDomainContextHandler()
     score_index = ContextSetting(0)
     n_repeats = Setting(5)
 
@@ -264,6 +266,9 @@ class OWPermutationImportance(OWExplainFeatureBase):
     def __parameter_changed(self):
         self.clear()
         self.start(self.run, *self.get_runner_parameters())
+
+    def openContext(self, model: Optional[Model]):
+        super().openContext(model.domain if model else None)
 
     def setup_controls(self):
         if self.model and self.model.domain.has_continuous_class:

@@ -18,7 +18,7 @@ from Orange.base import Model
 from Orange.data import Table
 from Orange.data.table import DomainTransformationError
 from Orange.widgets import gui
-from Orange.widgets.settings import Setting, ClassValuesContextHandler
+from Orange.widgets.settings import Setting
 from Orange.widgets.utils.concurrent import ConcurrentWidgetMixin, TaskState
 from Orange.widgets.utils.graphicslayoutitem import SimpleLayoutItem
 from Orange.widgets.utils.sql import check_sql_input
@@ -397,7 +397,6 @@ class OWExplainFeatureBase(OWWidget, ConcurrentWidgetMixin, openclass=True):
     class Information(OWWidget.Information):
         data_sampled = Msg("Data has been sampled.")
 
-    settingsHandler = ClassValuesContextHandler()
     n_attributes = Setting(10)
     zoom_level = Setting(0)
     selection = Setting((), schema_only=True)
@@ -473,7 +472,7 @@ class OWExplainFeatureBase(OWWidget, ConcurrentWidgetMixin, openclass=True):
         self.closeContext()
         self.model = model
         self.setup_controls()
-        self.openContext(self.model.domain.class_var if self.model else None)
+        self.openContext(self.model)
 
     def setup_controls(self):
         pass
