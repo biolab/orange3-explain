@@ -578,12 +578,13 @@ class TestExplainer(unittest.TestCase):
 
     def test_remove_calibration_workaround(self):
         """
-        When this test start to fail remove the workaround in
-        explainer.py-207:220 if allready fixed - revert the pullrequest
-        that adds those lines.
+        When this test start to fail:
+        - remove the workaround in explainer.py-207:220 if allready fixed -
+        revert the pullrequest that adds those lines
+        - set minimum Orange version to 3.28.0
         """
         self.assertGreater(
-            "3.29.0", pkg_resources.get_distribution("orange3").version
+            "3.31.0", pkg_resources.get_distribution("orange3").version
         )
 
 
