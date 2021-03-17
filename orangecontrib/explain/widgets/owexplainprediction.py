@@ -550,7 +550,7 @@ class OWExplainPrediction(OWWidget, ConcurrentWidgetMixin):
 
         gui.rubber(self.controlArea)
 
-        box = gui.vBox(self.controlArea, "Prediction info")
+        box = gui.vBox(self.buttonsArea, "Prediction info")
         gui.label(box, self, "%(mo_info)s")  # type: QLabel
         bv_label = gui.label(box, self, "%(bv_info)s")  # type: QLabel
         bv_label.setToolTip("The average prediction for selected class.")
