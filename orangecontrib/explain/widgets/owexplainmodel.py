@@ -332,7 +332,7 @@ class ViolinPlot(FeaturesPlot):
                 item.selection_changed.connect(self.select)
                 self._items.append(item)
                 self._layout.addItem(item, i, FeaturesPlot.ITEM_COLUMN)
-                if i == MAX_N_ITEMS:
+                if i == MAX_N_ITEMS - 1:
                     break
 
 
@@ -399,7 +399,7 @@ class OWExplainModel(OWExplainFeatureBase):
 
     # Plot setup
     def update_scene(self):
-        self._clear_scene()
+        super().update_scene()
         if self.results is not None:
             assert isinstance(self.results.x, list)
             x = self.results.x[self.target_index]
