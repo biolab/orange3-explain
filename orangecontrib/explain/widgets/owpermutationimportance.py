@@ -122,7 +122,7 @@ class FeatureImportancePlot(FeaturesPlot):
             item.set_data(x[i], std[i])
             self._items.append(item)
             self._layout.addItem(item, i, FeaturesPlot.ITEM_COLUMN)
-            if i == MAX_N_ITEMS:
+            if i == MAX_N_ITEMS - 1:
                 break
         self._bottom_axis.setLabel(x_label)
 
@@ -290,7 +290,7 @@ class OWPermutationImportance(OWExplainFeatureBase):
 
     # Plot setup
     def update_scene(self):
-        self._clear_scene()
+        super().update_scene()
         if self.results is not None:
             importance = self.results.x
             mean = np.mean(importance, axis=1)

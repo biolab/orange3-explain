@@ -205,6 +205,24 @@ class TestOWPermutationImportance(WidgetTest):
         self.wait_until_finished()
         self.assertEqual(mocked_func.call_args[0][3], 3)
 
+    @patch("orangecontrib.explain.widgets.owpermutationimportance."
+           "MAX_N_ITEMS", 3)
+    def test_n_attributes(self):
+        self.widget.controls.n_attributes.setValue(3)
+        self.send_signal(self.widget.Inputs.data, self.iris)
+        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+        self.wait_until_finished()
+        domain = self.iris.domain
+        domain = Domain(domain.attributes[:3], domain.class_vars)
+        self.assertDomainInPlot(self.widget.plot, domain)
+
+    def test_zoom_level(self):
+        self.send_signal(self.widget.Inputs.data, self.iris)
+        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+        self.wait_until_finished()
+        self.widget.controls.zoom_level.setValue(10)
+        self.assertDomainInPlot(self.widget.plot, self.iris.domain)
+
     def test_plot(self):
         self.send_signal(self.widget.Inputs.data, self.iris)
         self.wait_until_finished()

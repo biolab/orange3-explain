@@ -397,6 +397,7 @@ class OWExplainFeatureBase(OWWidget, ConcurrentWidgetMixin, openclass=True):
     class Information(OWWidget.Information):
         data_sampled = Msg("Data has been sampled.")
 
+    settingsHandler = NotImplemented
     n_attributes = Setting(10)
     zoom_level = Setting(0)
     selection = Setting((), schema_only=True)
@@ -502,11 +503,6 @@ class OWExplainFeatureBase(OWWidget, ConcurrentWidgetMixin, openclass=True):
 
     def update_scene(self):
         self._clear_scene()
-        if self.results is not None:
-            values = np.mean(self.results.x, axis=0)
-            indices = np.argsort(values)[::-1]
-            names = [self.results.names[i] for i in indices]
-            self.setup_plot(values[indices], names)
 
     def setup_plot(self, values: np.ndarray, names: List[str], *plot_args):
         width = int(self.view.viewport().rect().width())
@@ -622,6 +618,7 @@ class OWExplainFeatureBase(OWWidget, ConcurrentWidgetMixin, openclass=True):
 
 if __name__ == "__main__":  # pragma: no cover
     from Orange.classification import RandomForestLearner
+    from Orange.widgets.settings import DomainContextHandler
     from Orange.widgets.utils.widgetpreview import WidgetPreview
 
 
@@ -676,6 +673,7 @@ if __name__ == "__main__":  # pragma: no cover
     class Widget(OWExplainFeatureBase):
         name = "Explain"
         PLOT_CLASS = Plot
+        settingsHandler = DomainContextHandler()
 
         def update_selection(self, *_):
             pass
@@ -685,6 +683,14 @@ if __name__ == "__main__":  # pragma: no cover
 
         def get_scores_table(self):
             return None
+
+        def update_scene(self):
+            super().update_scene()
+            if self.results is not None:
+                values = np.mean(self.results.x, axis=0)
+                indices = np.argsort(values)[::-1]
+                names = [self.results.names[i] for i in indices]
+                self.setup_plot(values[indices], names)
 
         @staticmethod
         def run(data, model, state):
