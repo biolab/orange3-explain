@@ -2,6 +2,7 @@
 from typing import Callable
 
 import numpy as np
+import scipy.sparse as sp
 
 from Orange.base import Model
 from Orange.classification import Model as ClsModel
@@ -82,7 +83,12 @@ def _check_model(model: Model, data: Table) -> bool:
         )
 
     mod_data_X = model.data_to_model_domain(data).X
-    return data.X.shape != mod_data_X.shape or not (data.X == mod_data_X).all()
+    if data.X.shape != mod_data_X.shape:
+        return True
+    elif sp.issparse(data.X) and sp.issparse(mod_data_X):
+        return (data.X != mod_data_X).nnz != 0
+    else:
+        return (data.X != mod_data_X).any()
 
 
 def _wrap_score(
