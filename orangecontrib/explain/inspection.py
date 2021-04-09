@@ -68,6 +68,8 @@ def permutation_feature_importance(
 def _check_data(data: Table):
     if not data.domain.class_var:
         raise ValueError("Data with a target variable required.")
+    if not data.domain.attributes:
+        raise ValueError("Data with features required.")
 
 
 def _check_model(model: Model, data: Table) -> bool:
