@@ -234,6 +234,15 @@ class TestPermutationFeatureImportance(unittest.TestCase):
         self.assertRaises(DomainTransformationError,
                           permutation_feature_importance, *args)
 
+    def test_inadequate_data(self):
+        domain = Domain([],
+                        class_vars=self.iris.domain.class_vars,
+                        metas=self.iris.domain.attributes)
+        data = self.iris.transform(domain)
+        model = RandomForestLearner()(self.iris)
+        args = model, data, self.n_repeats
+        self.assertRaises(ValueError, permutation_feature_importance, *args)
+
     def test_inadequate_model(self):
         model = RandomForestLearner()(self.iris)
         args = model, self.housing, self.n_repeats

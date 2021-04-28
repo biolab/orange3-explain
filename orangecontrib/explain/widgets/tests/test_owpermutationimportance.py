@@ -81,6 +81,17 @@ class TestOWPermutationImportance(WidgetTest):
         self.assertPlotEmpty(self.widget.plot)
         self.assertTrue(self.widget.Error.unknown_err.is_shown())
 
+    def test_data_with_no_features(self):
+        domain = Domain([],
+                        class_vars=self.iris.domain.class_vars,
+                        metas=self.iris.domain.attributes)
+        data = self.iris.transform(domain)
+        self.send_signal(self.widget.Inputs.data, data)
+        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+        self.wait_until_finished()
+        self.assertPlotEmpty(self.widget.plot)
+        self.assertTrue(self.widget.Error.unknown_err.is_shown())
+
     def test_output_scores(self):
         self.send_signal(self.widget.Inputs.data, self.iris)
         self.send_signal(self.widget.Inputs.model, self.rf_cls)
