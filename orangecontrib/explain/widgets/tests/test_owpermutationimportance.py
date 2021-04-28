@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import patch, Mock
 
 import numpy as np
+import scipy.sparse as sp
 
 from AnyQt.QtCore import Qt, QPoint
 from AnyQt.QtGui import QFont
@@ -288,6 +289,31 @@ class TestOWPermutationImportance(WidgetTest):
         self.send_signal(self.widget.Inputs.model, None)
         self.wait_until_finished()
         self.assertFalse(self.widget.Information.data_sampled.is_shown())
+
+    def test_sparse_data(self):
+        data = self.heart
+        sparse_data = data.to_sparse()
+        sparse_data.X = sp.csr_matrix(sparse_data.X)
+
+        sparse_model = RandomForestLearner(random_state=0)(sparse_data)
+        self.send_signal(self.widget.Inputs.data, sparse_data)
+        self.send_signal(self.widget.Inputs.model, sparse_model)
+        self.wait_until_finished()
+        self.assertFalse(self.widget.Error.domain_transform_err.is_shown())
+        self.assertFalse(self.widget.Error.unknown_err.is_shown())
+
+        model = RandomForestLearner(random_state=0)(data)
+        self.send_signal(self.widget.Inputs.data, sparse_data)
+        self.send_signal(self.widget.Inputs.model, model)
+        self.wait_until_finished()
+        self.assertFalse(self.widget.Error.domain_transform_err.is_shown())
+        self.assertFalse(self.widget.Error.unknown_err.is_shown())
+
+        self.send_signal(self.widget.Inputs.data, data)
+        self.send_signal(self.widget.Inputs.model, sparse_model)
+        self.wait_until_finished()
+        self.assertFalse(self.widget.Error.domain_transform_err.is_shown())
+        self.assertFalse(self.widget.Error.unknown_err.is_shown())
 
     def test_send_report(self):
         self.widget.send_report()

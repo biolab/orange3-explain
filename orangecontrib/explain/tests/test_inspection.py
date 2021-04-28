@@ -239,6 +239,27 @@ class TestPermutationFeatureImportance(unittest.TestCase):
         args = model, self.housing, self.n_repeats
         self.assertRaises(ValueError, permutation_feature_importance, *args)
 
+    def test_sparse_data(self):
+        sparse_data = self.heart.to_sparse()
+        model = RandomForestLearner(random_state=0)(sparse_data)
+        res = permutation_feature_importance(model, sparse_data,
+                                             CA(), self.n_repeats)
+        shape = len(sparse_data.domain.attributes), self.n_repeats
+        self.assertEqual(res[0].shape, shape)
+        self.assertEqual(
+            res[1], [a.name for a in sparse_data.domain.attributes]
+        )
+
+        sparse_data = self.iris.to_sparse()
+        model = RandomForestLearner(random_state=0)(sparse_data)
+        res = permutation_feature_importance(model, sparse_data,
+                                             CA(), self.n_repeats)
+        shape = len(sparse_data.domain.attributes), self.n_repeats
+        self.assertEqual(res[0].shape, shape)
+        self.assertEqual(
+            res[1], [a.name for a in sparse_data.domain.attributes]
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
