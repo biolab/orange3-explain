@@ -12,7 +12,7 @@ from AnyQt.QtWidgets import QGraphicsRectItem, QGraphicsSceneMouseEvent, \
 from Orange.base import Model
 from Orange.classification import RandomForestLearner
 from Orange.data import Table, DiscreteVariable, Domain, ContinuousVariable, \
-    StringVariable
+    StringVariable, HasClass
 from Orange.evaluation.scoring import Score
 from Orange.regression import RandomForestRegressionLearner
 from Orange.widgets import gui
@@ -21,6 +21,7 @@ from Orange.widgets.settings import Setting, ContextSetting, \
     PerfectDomainContextHandler
 from Orange.widgets.utils.concurrent import TaskState
 from Orange.widgets.utils.widgetpreview import WidgetPreview
+from Orange.widgets.widget import Msg
 
 from orangecontrib.explain.inspection import permutation_feature_importance
 from orangecontrib.explain.widgets.owexplainfeaturebase import \
@@ -247,6 +248,10 @@ class OWPermutationImportance(OWExplainFeatureBase):
 
     PLOT_CLASS = FeatureImportancePlot
 
+    class Warning(OWExplainFeatureBase.Warning):
+        missing_target = Msg("Instances with unknown target values "
+                             "were removed from data.")
+
     # GUI setup
     def _add_controls(self):
         box = gui.vBox(self.controlArea, "Parameters")
@@ -266,6 +271,12 @@ class OWPermutationImportance(OWExplainFeatureBase):
     def __parameter_changed(self):
         self.clear()
         self.start(self.run, *self.get_runner_parameters())
+
+    def _check_data(self):
+        self.Warning.missing_target.clear()
+        if self.data and np.isnan(self.data.Y).any():
+            self.Warning.missing_target()
+            self.data = HasClass()(self.data)
 
     def openContext(self, model: Optional[Model]):
         super().openContext(model.domain if model else None)
