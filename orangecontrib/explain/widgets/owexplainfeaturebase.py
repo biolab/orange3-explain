@@ -467,6 +467,10 @@ class OWExplainFeatureBase(OWWidget, ConcurrentWidgetMixin, openclass=True):
         summary = len(data) if data else self.info.NoInput
         details = format_summary_details(data) if data else ""
         self.info.set_input_summary(summary, details)
+        self._check_data()
+
+    def _check_data(self):
+        pass
 
     @Inputs.model
     def set_model(self, model: Optional[Model]):
@@ -490,7 +494,9 @@ class OWExplainFeatureBase(OWWidget, ConcurrentWidgetMixin, openclass=True):
         self.cancel()
         self._clear_selection()
         self._clear_scene()
-        self.clear_messages()
+        self.Error.domain_transform_err.clear()
+        self.Error.unknown_err.clear()
+        self.Information.data_sampled.clear()
 
     # Plot setup
     def _clear_scene(self):

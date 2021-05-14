@@ -92,6 +92,20 @@ class TestOWPermutationImportance(WidgetTest):
         self.assertPlotEmpty(self.widget.plot)
         self.assertTrue(self.widget.Error.unknown_err.is_shown())
 
+    def test_missing_target(self):
+        data = self.housing.copy()
+        data.Y[0] = np.nan
+        rf = RandomForestRegressionLearner(random_state=0)(data)
+
+        self.send_signal(self.widget.Inputs.data, data)
+        self.send_signal(self.widget.Inputs.model, rf)
+        self.wait_until_finished()
+        self.assertDomainInPlot(self.widget.plot, data.domain)
+        self.assertTrue(self.widget.Warning.missing_target.is_shown())
+
+        self.send_signal(self.widget.Inputs.data, None)
+        self.assertFalse(self.widget.Warning.missing_target.is_shown())
+
     def test_output_scores(self):
         self.send_signal(self.widget.Inputs.data, self.iris)
         self.send_signal(self.widget.Inputs.model, self.rf_cls)
