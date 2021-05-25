@@ -8,6 +8,7 @@ Widgets
 .. toctree::
    :maxdepth: 1
 
+   widgets/permutation-importance
    widgets/explain-model
    widgets/explain-prediction
 
