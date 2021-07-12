@@ -19,7 +19,7 @@ import Orange
 from Orange.base import Learner
 from Orange.classification import RandomForestLearner, OneClassSVMLearner, \
     IsolationForestLearner, EllipticEnvelopeLearner, LocalOutlierFactorLearner
-from Orange.data import Table, Domain
+from Orange.data import Table, Domain, ContinuousVariable
 from Orange.regression import RandomForestRegressionLearner
 
 from orangecontrib.explain.widgets.owexplainfeaturebase import VariableItem
@@ -35,6 +35,7 @@ def dummy_run(data, model, _):
         if data.domain.has_discrete_class else 1
     mask = np.ones(m, dtype=bool)
     mask[150:] = False
+    m = min(150, m)
     return Results(x=[np.ones((m, n)) for _ in range(k)],
                    colors=np.zeros((m, n) + (3,)),
                    names=[str(i) for i in range(n)],
@@ -91,6 +92,33 @@ class TestOWExplainModel(WidgetTest):
                          [a.name for a in self.iris.domain.attributes])
         self.send_signal(self.widget.Inputs.model, None)
         self.assertIsNone(self.get_output(self.widget.Outputs.scores))
+
+    def test_output_impact(self):
+        self.send_signal(self.widget.Inputs.data, self.iris)
+        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+        self.wait_until_finished()
+        output = self.get_output(self.widget.Outputs.impact)
+        self.assertIsInstance(output, Table)
+
+        names = ["I(sepal length)", "I(sepal width)",
+                 "I(petal length)", "I(petal width)", "iris"]
+        self.assertEqual(names, [v.name for v in output.domain.variables])
+        self.assertTrue(all(isinstance(v, ContinuousVariable)
+                            for v in output.domain.attributes))
+
+        self.send_signal(self.widget.Inputs.model, None)
+        self.assertIsNone(self.get_output(self.widget.Outputs.impact))
+
+    def test_output_impact_sampled(self):
+        big_data = Table.concatenate([self.heart] * 4, 0)
+        self.send_signal(self.widget.Inputs.data, big_data)
+        rf_cls = RandomForestLearner(random_state=42)(big_data)
+        self.send_signal(self.widget.Inputs.model, rf_cls)
+        self.wait_until_finished()
+
+        output = self.get_output(self.widget.Outputs.impact)
+        self.assertIsInstance(output, Table)
+        self.assertEqual(len(output), 1000)
 
     def test_selection(self):
         self.send_signal(self.widget.Inputs.data, self.iris)

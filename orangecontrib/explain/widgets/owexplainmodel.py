@@ -13,6 +13,7 @@ from AnyQt.QtWidgets import QGraphicsItemGroup, QGraphicsWidget, \
 from Orange.base import Model
 from Orange.classification import RandomForestLearner
 from Orange.data import Table, Domain, ContinuousVariable, StringVariable
+from Orange.data.util import get_unique_names
 from Orange.regression import RandomForestRegressionLearner
 from Orange.widgets import gui
 from Orange.widgets.settings import Setting, ContextSetting, \
@@ -20,6 +21,7 @@ from Orange.widgets.settings import Setting, ContextSetting, \
 from Orange.widgets.utils.concurrent import TaskState
 from Orange.widgets.utils.widgetpreview import WidgetPreview
 from Orange.widgets.visualize.utils.customizableplot import Updater
+from Orange.widgets.widget import Output
 
 from orangecontrib.explain.explainer import \
     get_shap_values_and_colors, RGB_LOW, RGB_HIGH, temp_seed
@@ -346,6 +348,9 @@ class OWExplainModel(OWExplainFeatureBase):
         "orangecontrib.prototypes.widgets.owexplainmodel.OWExplainModel"
     ]
 
+    class Outputs(OWExplainFeatureBase.Outputs):
+        impact = Output("Impact", Table)
+
     settingsHandler = ClassValuesContextHandler()
     target_index = ContextSetting(0)
     show_legend = Setting(True)
@@ -375,6 +380,7 @@ class OWExplainModel(OWExplainFeatureBase):
     def __target_combo_changed(self):
         self.update_scene()
         self.update_scores()
+        self.update_impact()
         self._clear_selection()
 
     def __show_check_changed(self):
@@ -460,6 +466,30 @@ class OWExplainModel(OWExplainFeatureBase):
                              metas=np.array(self.results.names)[:, None])
         scores_table.name = "Feature Scores"
         return scores_table
+
+    def update_impact(self):
+        impact = None
+        if self.results is not None:
+            impact = self.get_impact_table()
+        self.Outputs.impact.send(impact)
+
+    def get_impact_table(self) -> Table:
+        data = self.data
+        x = self.results.x[self.target_index]
+        mask = self.results.mask
+        proposed = [f"I({n})" for n in self.results.names]
+        names = [v.name for v in data.domain.class_vars + data.domain.metas]
+        proposed = get_unique_names(names, proposed)
+        domain = Domain([ContinuousVariable(n) for n in proposed],
+                        data.domain.class_vars, metas=data.domain.metas)
+        impact_table = Table(domain, x, data.Y[mask], data.metas[mask])
+        impact_table.name = "Feature Impact"
+        return impact_table
+
+    # Concurrent
+    def on_done(self, results: Optional[BaseResults]):
+        super().on_done(results)
+        self.update_impact()
 
     # Misc
     def send_report(self):
