@@ -48,7 +48,8 @@ INSTALL_REQUIRES = [
 ]
 
 EXTRAS_REQUIRE = {
-    'test': ['pytest', 'coverage']
+    'test': ['pytest', 'coverage'],
+    'doc': ['sphinx', 'recommonmark', 'sphinx_rtd_theme'],
 }
 
 ENTRY_POINTS = {
@@ -91,7 +92,7 @@ def include_documentation(local_dir, install_dir):
 
 
 if __name__ == "__main__":
-    include_documentation("doc/_build/htmlhelp", "help/orange3-explain")
+    include_documentation("doc/_build/html", "help/orange3-explain")
     setup(
         author=AUTHOR,
         author_email=AUTHOR_EMAIL,
