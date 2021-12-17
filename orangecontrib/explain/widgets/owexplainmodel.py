@@ -128,56 +128,40 @@ class ViolinItem(FeatureItem):
         parent.selection_cleared.connect(self.__remove_selection_rect)
 
     def set_data(self, x_data: np.ndarray, color_data: np.ndarray):
-        def put_point(_x, _y):
+        def place_point(_x, _y, _c):
             item = QGraphicsEllipseItem()
             item.setX(_x)
             item.setY(_y)
             item.setRect(0, 0, self.POINT_R, self.POINT_R)
-            color = QColor(*colors.pop().astype(int))
+            color = QColor(*_c)
             item.setPen(QPen(color))
             item.setBrush(QBrush(color))
             self._group.addToGroup(item)
 
         self._x_data = x_data
+        for x, y, c in zip(self._values_to_pixels(self._x_data),
+                           self._prepare_y_data(self._x_data),
+                           color_data):
+            place_point(x, y, c)
 
-        x_data_unique, dist, x_data = self.prepare_data()
-        for x, d in zip(x_data_unique, dist):
-            colors = color_data[x_data == np.round(x, 3)]
-            colors = list(colors[np.random.choice(len(colors), 11)])
-            y = self._height / 2 - self.POINT_R / 2
-            self.plot_data(put_point, x, y, d)
+    def _prepare_y_data(self, shaps: np.ndarray) -> np.ndarray:
+        with temp_seed(0):
+            n, nbins = len(shaps), 100
+            min_, max_ = np.min(shaps), np.max(shaps)
+            quant = np.round(nbins * (shaps - min_) / (max_ - min_ + 1e-8))
+            inds = np.argsort(quant + np.random.randn(n) * 1e-6)
 
-    def prepare_data(self) -> \
-            Optional[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
-        x_data = self._values_to_pixels(self._x_data)
-        x_data = x_data[~np.isnan(x_data)]
-        if len(x_data) == 0:
-            return None
+        layer, last_bin = 0, -1
+        ys = np.zeros(n)
+        for ind in inds:
+            if quant[ind] != last_bin:
+                layer = 0
+            ys[ind] = np.ceil(layer / 2) * ((layer % 2) * 2 - 1)
+            layer += 1
+            last_bin = quant[ind]
 
-        x_data = np.round(x_data - self.POINT_R / 2, 3)
-
-        # remove duplicates and get counts (distribution) to set y
-        x_data_unique, counts = np.unique(x_data, return_counts=True)
-        min_count, max_count = np.min(counts), np.max(counts)
-        dist = (counts - min_count) / (max_count - min_count)
-        if min_count == max_count:
-            dist[:] = 1
-        dist = dist ** 0.7
-
-        # plot rarest values first
-        indices = np.argsort(counts)
-        return x_data_unique[indices], dist[indices], x_data
-
-    @staticmethod
-    def plot_data(func: Callable, x: float, y: float, d: float):
-        func(x, y)  # y = 0
-        if d > 0:
-            offset = d * 10
-            func(x, y + offset)  # y = (0, 10]
-            func(x, y - offset)  # y = (-10, 0]
-            for i in range(2, int(offset), 2):
-                func(x, y + i)  # y = [2, 8]
-                func(x, y - i)  # y = [-8, -2]
+        ys = ys * 0.4 / np.max(ys + 1)
+        return self._height / 2 - self.POINT_R / 2 + ys * self._height
 
     def _values_to_pixels(self, x: np.ndarray) -> np.ndarray:
         # scale data to [-0.5, 0.5]
@@ -185,7 +169,7 @@ class ViolinItem(FeatureItem):
         # round data to 3. decimal for sampling
         x = np.round(x, 3)
         # convert to pixels
-        return x * self._width + self._width / 2
+        return x * self._width + self._width / 2 - self.POINT_R / 2
 
     def _values_from_pixels(self, p: np.ndarray) -> np.ndarray:
         # convert from pixels
@@ -194,17 +178,12 @@ class ViolinItem(FeatureItem):
         return np.round(x * self._range / self.SCALE_FACTOR, 3)
 
     def rescale(self, width):
-        def move_point(_x, *_):
-            item = next(points)
-            item.setX(_x)
-
         self._width = width
         self.updateGeometry()
-        points = (item for item in self._group.childItems())
 
-        x_data_unique, dist, _ = self.prepare_data()
-        for x, d in zip(x_data_unique, dist):
-            self.plot_data(move_point, x, 0, d)
+        for x, item in zip(self._values_to_pixels(self._x_data),
+                           self._group.childItems()):
+            item.setX(x)
 
         if self._selection_rect is not None:
             old_width = self._selection_rect.parent_width
