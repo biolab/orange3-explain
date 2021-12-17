@@ -115,9 +115,10 @@ class ViolinItem(FeatureItem):
     selection_changed = Signal(float, float, str)
 
     class SelectionRect(BaseSelectionRect):
-        def __init__(self, parent, width: int):
+        def __init__(self, parent, width: int, height: int):
             super().__init__(parent)
             self.parent_width = width
+            self.parent_height = height
 
     def __init__(self, parent, attr_name: str, x_range: Tuple[float],
                  width: int):
@@ -196,7 +197,20 @@ class ViolinItem(FeatureItem):
 
     def set_height(self, height: float):
         self._height = height + self.HEIGHT
-        # TODO
+        for y, item in zip(self._prepare_y_data(self._x_data),
+                           self._group.childItems()):
+            item.setY(y)
+
+        if self._selection_rect is not None:
+            old_height = self._selection_rect.parent_height
+            rect = self._selection_rect.rect()
+            y1 = self._height * rect.y() / old_height
+            y2 = self._height * (rect.y() + rect.height()) / old_height
+            rect = QRectF(rect.x(), y1, rect.width(), y2 - y1)
+            self._selection_rect.setRect(rect)
+            self._selection_rect.parent_height = self._height
+
+        self.updateGeometry()
 
     def __remove_selection_rect(self):
         if self._selection_rect is not None:
@@ -208,7 +222,8 @@ class ViolinItem(FeatureItem):
     def add_selection_rect(self, x1, x2):
         x1, x2 = self._values_to_pixels(np.array([x1, x2]))
         rect = QRectF(x1, 0, x2 - x1, self._height)
-        self._selection_rect = ViolinItem.SelectionRect(self, self._width)
+        self._selection_rect = ViolinItem.SelectionRect(
+            self, self._width, self._height)
         self._selection_rect.setRect(rect)
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
@@ -218,7 +233,7 @@ class ViolinItem(FeatureItem):
         if event.buttons() & Qt.LeftButton:
             if self._selection_rect is None:
                 self._selection_rect = ViolinItem.SelectionRect(
-                    self, self._width)
+                    self, self._width, self._height)
             x = event.buttonDownPos(Qt.LeftButton).x()
             rect = QRectF(x, 0, event.pos().x() - x, self._height).normalized()
             rect = rect.intersected(self.contentsRect())
@@ -349,10 +364,6 @@ class OWExplainModel(OWExplainFeatureBase):
             contentsLength=12)
 
         super()._add_controls()
-
-        # TODO - implement zoom - ViolinItem.set_height()
-        self.controls.zoom_level.parent().setVisible(False)
-
         gui.checkBox(self.display_box, self, "show_legend", "Show legend",
                      callback=self.__show_check_changed)
 
