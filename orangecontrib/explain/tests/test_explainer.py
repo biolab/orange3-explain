@@ -91,7 +91,8 @@ class TestExplainer(unittest.TestCase):
     def test_kernel_explainer_sgd(self):
         learner = SGDClassificationLearner()
         model = learner(self.titanic)
-        np.random.shuffle(self.titanic.X)
+        with self.titanic.unlocked():
+            np.random.shuffle(self.titanic.X)
 
         shap_values, _, sample_mask, _ = compute_shap_values(
             model, self.titanic[:200], self.titanic[:200]
