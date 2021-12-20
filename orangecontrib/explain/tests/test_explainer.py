@@ -2,7 +2,6 @@ import inspect
 import unittest
 
 import numpy as np
-import pkg_resources
 
 from Orange.classification import (
     LogisticRegressionLearner,
@@ -13,7 +12,7 @@ from Orange.classification import (
     ThresholdLearner,
 )
 from Orange.data import Table, Domain
-from Orange.regression import LinearRegressionLearner
+from Orange.regression import LinearRegressionLearner, CurveFitLearner
 from Orange.tests import test_regression, test_classification
 from Orange.widgets.data import owcolor
 from orangecontrib.explain.explainer import (
@@ -184,8 +183,16 @@ class TestExplainer(unittest.TestCase):
     def test_all_regressors(self):
         """ Test explanation for all regressors """
         for learner in test_regression.all_learners():
-            with self.subTest(learner.name):
-                model = learner()(self.housing)
+            with self.subTest(learner):
+                if learner == CurveFitLearner:
+                    attr = self.housing.domain.attributes
+                    learner = CurveFitLearner(
+                        lambda x, a: np.sum(x[:, i] for i in range(len(attr))),
+                        [], [a.name for a in self.housing.domain.attributes]
+                    )
+                else:
+                    learner = learner()
+                model = learner(self.housing)
                 shap_values, _, _, _ = compute_shap_values(
                     model, self.housing, self.housing
                 )
