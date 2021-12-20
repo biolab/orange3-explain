@@ -38,7 +38,7 @@ DATA_FILES = [
 ]
 
 INSTALL_REQUIRES = [
-    "Orange3 >= 3.27.1",
+    "Orange3 >= 3.28.0",
     "orange-widget-base",
     "AnyQt",
     "numpy",

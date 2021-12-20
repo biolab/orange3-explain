@@ -205,24 +205,8 @@ def compute_shap_values(
             progress_callback = dummy_callback
         progress_callback(0, "Computing explanation ...")
 
-        #### workaround for bug with calibration
-        #### remove when fixed
-        from Orange.classification import (
-            ThresholdClassifier,
-            CalibratedClassifier,
-        )
-
-        trans_model = model
-        while isinstance(
-            trans_model, (ThresholdClassifier, CalibratedClassifier)
-        ):
-            trans_model = trans_model.base_model
-        #### end of workaround for bug with calibration
-
-        data_transformed = trans_model.data_to_model_domain(data)
-        reference_data_transformed = trans_model.data_to_model_domain(
-            reference_data
-        )
+        data_transformed = model.data_to_model_domain(data)
+        reference_data_transformed = model.data_to_model_domain(reference_data)
 
         shap_values, sample_mask, base_value = _explain_trees(
             model,

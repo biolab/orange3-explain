@@ -164,7 +164,7 @@ class TestExplainer(unittest.TestCase):
     def test_all_classifiers(self):
         """ Test explanation for all classifiers """
         for learner in test_classification.all_learners():
-            with self.subTest(learner.name):
+            with self.subTest(learner):
                 if learner == ThresholdLearner:
                     # ThresholdLearner require binary class
                     continue
@@ -181,10 +181,6 @@ class TestExplainer(unittest.TestCase):
                         self.iris.X.shape, shap_values[i].shape
                     )
 
-    @unittest.skipIf(
-        not hasattr(test_regression, "all_learners"),
-        "all_learners not available in Orange < 3.26",
-    )
     def test_all_regressors(self):
         """ Test explanation for all regressors """
         for learner in test_regression.all_learners():
@@ -575,17 +571,6 @@ class TestExplainer(unittest.TestCase):
 
         self.assertTupleEqual(self.iris.X.shape, shap_values[0].shape)
         self.assertTupleEqual((len(self.iris),), sample_mask.shape)
-
-    def test_remove_calibration_workaround(self):
-        """
-        When this test start to fail:
-        - remove the workaround in explainer.py-207:220 if allready fixed -
-        revert the pullrequest that adds those lines
-        - set minimum Orange version to 3.28.0
-        """
-        self.assertGreater(
-            "3.31.0", pkg_resources.get_distribution("orange3").version
-        )
 
 
 if __name__ == "__main__":
