@@ -1,5 +1,6 @@
 import unittest
 from unittest.mock import Mock
+import pkg_resources
 
 import numpy as np
 from sklearn.inspection import permutation_importance
@@ -121,6 +122,19 @@ class TestUtils(unittest.TestCase):
         mocked_model.assert_not_called()
         mocked_model.predict.assert_not_called()
         self.assertAlmostEqual(baseline_score, 2, 0)
+
+    def test_remove_init_unlocked(self):
+        """
+        When this test starts to fail:
+        - remove code in
+        /Users/vesna/orange3-explain/orangecontrib/explain/__init__.py
+        - remove this test
+        - set minimum Orange version to 3.31.0
+        """
+        self.assertGreater(
+            "3.33.0",
+            pkg_resources.get_distribution("orange3").version
+        )
 
 
 class TestPermutationFeatureImportance(unittest.TestCase):

@@ -318,7 +318,8 @@ class TestOWPermutationImportance(WidgetTest):
     def test_sparse_data(self):
         data = self.heart
         sparse_data = data.to_sparse()
-        sparse_data.X = sp.csr_matrix(sparse_data.X)
+        with sparse_data.unlocked():
+            sparse_data.X = sp.csr_matrix(sparse_data.X)
 
         sparse_model = RandomForestLearner(random_state=0)(sparse_data)
         self.send_signal(self.widget.Inputs.data, sparse_data)

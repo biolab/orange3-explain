@@ -54,10 +54,12 @@ def permutation_feature_importance(
 
     n_features = data.X.shape[1]
     step = 1 / n_features
-    perm_scores = [_calculate_permutation_scores(
-        model, data, i, n_repeats, scorer,
-        wrap_callback(progress_callback, start=i * step, end=(i + 1) * step)
-    ) for i in range(n_features)]
+    with data.unlocked():
+        perm_scores = [_calculate_permutation_scores(
+            model, data, i, n_repeats, scorer,
+            wrap_callback(progress_callback, start=i * step,
+                          end=(i + 1) * step)
+        ) for i in range(n_features)]
 
     names = [attr.name for attr in data.domain.attributes]
     scores = baseline_score - np.array(perm_scores)

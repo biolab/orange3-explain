@@ -2,7 +2,6 @@ import inspect
 import unittest
 
 import numpy as np
-import pkg_resources
 
 from Orange.classification import (
     LogisticRegressionLearner,
@@ -13,7 +12,7 @@ from Orange.classification import (
     ThresholdLearner,
 )
 from Orange.data import Table, Domain
-from Orange.regression import LinearRegressionLearner
+from Orange.regression import LinearRegressionLearner, CurveFitLearner
 from Orange.tests import test_regression, test_classification
 from Orange.widgets.data import owcolor
 from orangecontrib.explain.explainer import (
@@ -92,7 +91,8 @@ class TestExplainer(unittest.TestCase):
     def test_kernel_explainer_sgd(self):
         learner = SGDClassificationLearner()
         model = learner(self.titanic)
-        np.random.shuffle(self.titanic.X)
+        with self.titanic.unlocked():
+            np.random.shuffle(self.titanic.X)
 
         shap_values, _, sample_mask, _ = compute_shap_values(
             model, self.titanic[:200], self.titanic[:200]
@@ -164,7 +164,7 @@ class TestExplainer(unittest.TestCase):
     def test_all_classifiers(self):
         """ Test explanation for all classifiers """
         for learner in test_classification.all_learners():
-            with self.subTest(learner.name):
+            with self.subTest(learner):
                 if learner == ThresholdLearner:
                     # ThresholdLearner require binary class
                     continue
@@ -181,15 +181,19 @@ class TestExplainer(unittest.TestCase):
                         self.iris.X.shape, shap_values[i].shape
                     )
 
-    @unittest.skipIf(
-        not hasattr(test_regression, "all_learners"),
-        "all_learners not available in Orange < 3.26",
-    )
     def test_all_regressors(self):
         """ Test explanation for all regressors """
         for learner in test_regression.all_learners():
-            with self.subTest(learner.name):
-                model = learner()(self.housing)
+            with self.subTest(learner):
+                if learner == CurveFitLearner:
+                    attr = self.housing.domain.attributes
+                    learner = CurveFitLearner(
+                        lambda x, a: np.sum(x[:, i] for i in range(len(attr))),
+                        [], [a.name for a in self.housing.domain.attributes]
+                    )
+                else:
+                    learner = learner()
+                model = learner(self.housing)
                 shap_values, _, _, _ = compute_shap_values(
                     model, self.housing, self.housing
                 )
@@ -575,17 +579,6 @@ class TestExplainer(unittest.TestCase):
 
         self.assertTupleEqual(self.iris.X.shape, shap_values[0].shape)
         self.assertTupleEqual((len(self.iris),), sample_mask.shape)
-
-    def test_remove_calibration_workaround(self):
-        """
-        When this test start to fail:
-        - remove the workaround in explainer.py-207:220 if allready fixed -
-        revert the pullrequest that adds those lines
-        - set minimum Orange version to 3.28.0
-        """
-        self.assertGreater(
-            "3.31.0", pkg_resources.get_distribution("orange3").version
-        )
 
 
 if __name__ == "__main__":
