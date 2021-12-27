@@ -6,7 +6,7 @@ from Orange.widgets.utils.colorpalettes import LimitedDiscretePalette
 from scipy import sparse
 
 from Orange.base import Model
-from Orange.data import Table, Domain
+from Orange.data import Table, Domain, Variable
 from Orange.util import dummy_callback, wrap_callback
 from shap import KernelExplainer, TreeExplainer
 from shap.utils import sample
@@ -544,13 +544,118 @@ def prepare_force_plot_data(
     return selected_shap_values, segments, selected_labels, ranges
 
 
+def prepare_force_plot_data_multi_inst(
+    shap_values: List[np.ndarray],
+    base_value: np.ndarray,
+    target_class: int,
+    attributes: Tuple[Variable]
+) -> Tuple[np.ndarray, List[Tuple[np.ndarray, np.ndarray]],
+           List[Tuple[np.ndarray, np.ndarray]], List[str], List[str]]:
+    """
+    Prepare data for a force plot with multiple instances.
+
+    Parameters
+    ----------
+    shap_values : list:
+        List of SHAP values.
+
+    base_value : np.ndarray
+        An array of base values.
+
+    target_class : int
+        Target class to plot.
+
+    attributes : tuple
+        Collection of transformed_data.domain.attributes.
+
+    Returns
+    -------
+    x : np.ndarray
+        An array of x data.
+
+    pos_data : list
+        List of tuples of arrays for 'blue' intervals.
+
+    neg_data : list
+        List of tuples of arrays for 'red' intervals.
+
+    pos_labels : list
+        List of feature names for 'blue' intervals.
+
+    neg_labels : list
+        List of feature names for 'red' intervals.
+
+    """
+    shap_values = shap_values[target_class]
+    base_value = base_value[target_class]
+
+    exps = [(np.sum(shap_values[k, :]) + base_value, shap_values[k, :])
+            for k in range(shap_values.shape[0])]
+
+    pos_labels, neg_labels = [], []
+
+    pos_data = []
+    pos_idxs = np.argsort(shap_values.clip(min=0).sum(axis=0))[::-1]
+    for i, k in enumerate(pos_idxs):
+        y_upper = np.array([(s - v[pos_idxs[:i]].clip(0).sum())
+                            for s, v in exps])
+        y_lower = np.array([(s - v[pos_idxs[:i + 1]].clip(0).sum())
+                            for s, v in exps])
+        pos_data.append((y_upper, y_lower))
+
+        pos_labels.append(attributes[k].name)
+
+    neg_data = []
+    neg_idxs = np.argsort(shap_values.clip(max=0).sum(axis=0))
+    for i, k in enumerate(neg_idxs):
+        y_lower = np.array([(s - v[neg_idxs[:i]].clip(max=0).sum())
+                            for s, v in exps])
+        y_upper = np.array([(s - v[neg_idxs[:i + 1]].clip(max=0).sum())
+                            for s, v in exps])
+        neg_data.append((y_lower, y_upper))
+
+        neg_labels.append(attributes[k].name)
+
+    x_data = np.arange(shap_values.shape[0])
+
+    return x_data, pos_data, neg_data, pos_labels, neg_labels
+
+
 if __name__ == "__main__":
-    from Orange.classification import LogisticRegressionLearner
+    import matplotlib.pyplot as plt
+    from Orange.classification import RandomForestLearner
+    from Orange.regression import RandomForestRegressionLearner
 
-    data_ = Table.from_file("heart_disease.tab")
-    learner = LogisticRegressionLearner()
-    model_ = learner(data_)
+    table = Table("housing")
+    if table.domain.has_continuous_class:
+        model_ = RandomForestRegressionLearner(
+            n_estimators=10, random_state=0)(table)
+    else:
+        model_ = RandomForestLearner(
+            n_estimators=10, random_state=0)(table)
 
-    shap_val, transformed_domain, mask, colors_ = get_shap_values_and_colors(
-        model_, data_
-    )
+    shap_values_, transformed_, _, base_value_ = \
+        compute_shap_values(model_, table[:50], table)
+    x_data_, pos_data_, neg_data_, pos_lab_, neg_lab_ = \
+        prepare_force_plot_data_multi_inst(shap_values_, base_value_, 0,
+                                           table.domain.attributes)
+
+    print(pos_lab_)
+    print(neg_lab_)
+
+    for y1, y2 in pos_data_:
+        color = tuple(np.array(RGB_HIGH) / 255)
+        light_color = tuple((np.array(RGB_HIGH) +
+                             (255 - np.array(RGB_HIGH)) * 0.7) / 255)
+        plt.plot(x_data_, y1, color=light_color, linewidth=1)
+        plt.plot(x_data_, y2, color=light_color, linewidth=1)
+        plt.fill_between(x_data_, y1, y2, color=color)
+
+    for y1, y2 in neg_data_:
+        color = tuple(np.array(RGB_LOW) / 255)
+        light_color = tuple((np.array(RGB_LOW) +
+                             (255 - np.array(RGB_LOW)) * 0.7) / 255)
+        plt.plot(x_data_, y1, color=light_color, linewidth=1)
+        plt.plot(x_data_, y2, color=light_color, linewidth=1)
+        plt.fill_between(x_data_, y1, y2, color=color)
+    plt.show()
