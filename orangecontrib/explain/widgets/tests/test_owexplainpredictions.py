@@ -88,11 +88,38 @@ class TestOWExplainPredictions(WidgetTest):
         self.assertEqual(self.widget._target_combo.currentText(), "")
         self.assertTrue(self.widget._target_combo.isEnabled())
 
-    def test_sort_combo(self):
-        self.assertEqual(True, False)
+    def test_order_combo(self):
+        self.assertEqual(self.widget._order_combo.currentText(),
+                         "Original instance ordering")
+        self.assertEqual(self.widget._order_combo.count(), 3)
+
+        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+        self.assertEqual(self.widget._order_combo.currentText(),
+                         "Original instance ordering")
+        # 1 separator
+        self.assertEqual(self.widget._order_combo.count(),
+                         len(self.rf_cls.domain.attributes) + 1 +
+                         len(self.widget.ORDERS))
+
+        self.send_signal(self.widget.Inputs.model, None)
+        self.assertEqual(self.widget._order_combo.currentText(),
+                         "Original instance ordering")
+        self.assertEqual(self.widget._order_combo.count(), 3)
 
     def test_annotation_combo(self):
-        self.assertEqual(True, False)
+        self.assertEqual(self.widget._annot_combo.currentText(), "Enumeration")
+        self.assertEqual(self.widget._annot_combo.count(), 1)
+
+        self.send_signal(self.widget.Inputs.model, self.rf_reg)
+        self.assertEqual(self.widget._annot_combo.currentText(), "Enumeration")
+        # 2 separators
+        self.assertEqual(self.widget._annot_combo.count(),
+                         len(self.rf_reg.domain) + 2 +
+                         len(self.widget.ANNOTATIONS))
+
+        self.send_signal(self.widget.Inputs.model, None)
+        self.assertEqual(self.widget._annot_combo.currentText(), "Enumeration")
+        self.assertEqual(self.widget._annot_combo.count(), 1)
 
     def test_plot(self):
         self.send_signal(self.widget.Inputs.data, self.heart)

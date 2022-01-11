@@ -1,16 +1,20 @@
+from itertools import chain
 from types import SimpleNamespace
 from typing import Optional, List
 
 import numpy as np
+from AnyQt.QtCore import Qt
 
 import pyqtgraph as pg
 from Orange.base import Model
 from Orange.data import Table
 from Orange.data.table import DomainTransformationError
 from Orange.widgets import gui
-from Orange.widgets.settings import ContextSetting, \
-    ClassValuesContextHandler
+from Orange.widgets.settings import ContextSetting, Setting, \
+    DomainContextHandler
 from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
+from Orange.widgets.utils.itemmodels import VariableListModel
+from Orange.widgets.utils.plot import OWPlotGUI
 from Orange.widgets.utils.sql import check_sql_input
 from Orange.widgets.utils.widgetpreview import WidgetPreview
 from Orange.widgets.widget import Input, Output, OWWidget, Msg
@@ -67,6 +71,18 @@ class ForcePlot(pg.PlotWidget):
     def clear_all(self):
         self.clear()
 
+    def zoom_button_clicked(self):
+        pass
+
+    def pan_button_clicked(self):
+        pass
+
+    def select_button_clicked(self):
+        pass
+
+    def reset_button_clicked(self):
+        pass
+
 
 class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     name = "Explain Predictions"
@@ -91,10 +107,20 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         multiple_instances = Msg("Explaining prediction for the first "
                                  "instance in 'Data'.")
 
-    settingsHandler = ClassValuesContextHandler()
-    target_index = ContextSetting(0)
+    buttons_area_orientation = Qt.Vertical
 
-    graph_name = "scene"
+    settingsHandler = DomainContextHandler()
+    target_index = ContextSetting(0)
+    order_index = ContextSetting(0)
+    annot_index = ContextSetting(0)
+    auto_send = Setting(True)
+
+    graph_name = "graph.plotItem"
+
+    ORDERS = ["Original instance ordering",
+              "Order instances by output value",
+              "Order instances by similarity"]
+    ANNOTATIONS = ["Enumeration"]
 
     def __init__(self):
         OWWidget.__init__(self)
@@ -109,21 +135,50 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     def setup_gui(self):
         self._add_plot()
         self._add_controls()
+        self._add_buttons()
 
     def _add_plot(self):
         box = gui.vBox(self.mainArea)
-        self._plot = ForcePlot(self)
-        box.layout().addWidget(self._plot)
+        self.graph = ForcePlot(self)
+        box.layout().addWidget(self.graph)
 
     def _add_controls(self):
         box = gui.vBox(self.controlArea, "Target class")
         self._target_combo = gui.comboBox(box, self, "target_index",
-                                          callback=self.__target_combo_changed,
+                                          callback=self.__on_target_changed,
                                           contentsLength=12)
+
+        box = gui.vBox(self.controlArea, "Instance order")
+        self._order_combo = gui.comboBox(box, self, "order_index",
+                                         callback=self.__on_order_changed,
+                                         searchable=True, contentsLength=12)
+        model = VariableListModel()
+        model[:] = self.ORDERS
+        self._order_combo.setModel(model)
+
+        box = gui.vBox(self.controlArea, "Annotation")
+        self._annot_combo = gui.comboBox(box, self, "annot_index",
+                                         callback=self.__on_annot_changed,
+                                         searchable=True, contentsLength=12)
+        model = VariableListModel()
+        model[:] = self.ANNOTATIONS
+        self._annot_combo.setModel(model)
+
         gui.rubber(self.controlArea)
 
-    def __target_combo_changed(self):
+    def __on_target_changed(self):
         self.setup_plot()
+
+    def __on_order_changed(self):
+        self.setup_plot()
+
+    def __on_annot_changed(self):
+        self.setup_plot()
+
+    def _add_buttons(self):
+        plot_gui = OWPlotGUI(self)
+        plot_gui.box_zoom_select(self.buttonsArea)
+        gui.auto_send(self.buttonsArea, self, "auto_send")
 
     @Inputs.data
     @check_sql_input
@@ -140,20 +195,49 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         self.closeContext()
         self.model = model
         self.setup_controls()
-        self.openContext(self.model.domain.class_var if self.model else None)
+        self.openContext(self.model.domain if self.model else None)
 
     def setup_controls(self):
         self._target_combo.clear()
         self._target_combo.setEnabled(True)
-        if self.model is not None:
-            if self.model.domain.has_discrete_class:
-                self._target_combo.addItems(self.model.domain.class_var.values)
+
+        self.order_index = 0
+        self.annot_index = 0
+        self._order_combo.clear()
+        self._annot_combo.clear()
+        orders = self.ORDERS
+        annotations = self.ANNOTATIONS
+
+        model = self.model
+        if model is not None:
+            if model.domain.has_discrete_class:
+                self._target_combo.addItems(model.domain.class_var.values)
                 self.target_index = 0
-            elif self.model.domain.has_continuous_class:
+            elif model.domain.has_continuous_class:
                 self.target_index = -1
                 self._target_combo.setEnabled(False)
             else:
                 raise NotImplementedError
+
+            c_attrs = [a for a in model.domain.attributes if a.is_continuous]
+            orders = chain(
+                self.ORDERS,
+                [VariableListModel.Separator] if c_attrs else [],
+                c_attrs,
+            )
+
+            annotations = chain(
+                self.ANNOTATIONS,
+                [VariableListModel.Separator] if model.domain.metas else [],
+                self.model.domain.metas,
+                [VariableListModel.Separator],
+                self.model.domain.class_vars,
+                [VariableListModel.Separator],
+                self.model.domain.attributes,
+            )
+
+        self._order_combo.model()[:] = orders
+        self._annot_combo.model()[:] = annotations
 
     def handleNewSignals(self):
         self.clear()
@@ -163,10 +247,10 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         self.__results = None
         self.cancel()
         self.clear_messages()
-        self._plot.clear_all()
+        self.graph.clear_all()
 
     def setup_plot(self):
-        self._plot.clear_all()
+        self.graph.clear_all()
         if not self.__results or not self.data:
             return
 
@@ -178,7 +262,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
                 self.__results.transformed_data.domain.attributes
             )
 
-        self._plot.set_data(x_data, pos_y_data, neg_y_data)
+        self.graph.set_data(x_data, pos_y_data, neg_y_data)
 
     def on_partial_result(self, _):
         pass
@@ -192,6 +276,9 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
             self.Error.domain_transform_err(ex)
         else:
             self.Error.unknown_err(ex)
+
+    def commit(self):
+        pass
 
     def onDeleteWidget(self):
         self.shutdown()
