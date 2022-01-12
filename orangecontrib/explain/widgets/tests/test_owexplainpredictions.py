@@ -10,6 +10,7 @@ from Orange.regression import RandomForestRegressionLearner
 from Orange.tests.test_classification import all_learners as all_cls_learners
 from Orange.tests.test_regression import all_learners as all_reg_learners, \
     init_learner as init_reg_learner
+from Orange.widgets.tests.utils import simulate
 from orangecontrib.explain.widgets.owexplainpredictions import ForcePlot, \
     OWExplainPredictions
 from orangewidget.tests.base import WidgetTest
@@ -217,6 +218,31 @@ class TestOWExplainPredictions(WidgetTest):
 
         self.send_signal(self.widget.Inputs.data, None)
         self.assertIsNone(self.get_output(self.widget.Outputs.annotated_data))
+
+    def test_settings(self):
+        self.send_signal(self.widget.Inputs.data, self.heart[:10])
+        self.send_signal(self.widget.Inputs.background_data, self.heart)
+        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+
+        simulate.combobox_activate_index(self.widget._target_combo, 1)
+        simulate.combobox_activate_index(self.widget._order_combo, 4)
+        simulate.combobox_activate_index(self.widget._annot_combo, 2)
+
+        self.send_signal(self.widget.Inputs.data, self.housing[:10])
+        self.send_signal(self.widget.Inputs.background_data, self.housing)
+        self.send_signal(self.widget.Inputs.model, self.rf_reg)
+
+        self.assertEqual(self.widget.target_index, -1)
+        self.assertEqual(self.widget.order_index, 0)
+        self.assertEqual(self.widget.annot_index, 0)
+
+        self.send_signal(self.widget.Inputs.data, self.heart[:10])
+        self.send_signal(self.widget.Inputs.background_data, self.heart)
+        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+
+        self.assertEqual(self.widget.target_index, 1)
+        self.assertEqual(self.widget.order_index, 4)
+        self.assertEqual(self.widget.annot_index, 2)
 
     def test_saved_workflow(self):
         self.assertEqual(True, False)

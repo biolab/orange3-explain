@@ -11,7 +11,7 @@ from Orange.data import Table, Domain, ContinuousVariable
 from Orange.data.table import DomainTransformationError
 from Orange.widgets import gui
 from Orange.widgets.settings import ContextSetting, Setting, \
-    DomainContextHandler
+    PerfectDomainContextHandler
 from Orange.widgets.utils.annotated_data import ANNOTATED_DATA_SIGNAL_NAME, \
     create_annotated_table
 from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
@@ -113,7 +113,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
 
     buttons_area_orientation = Qt.Vertical
 
-    settingsHandler = DomainContextHandler()
+    settingsHandler = PerfectDomainContextHandler()
     target_index = ContextSetting(0)
     order_index = ContextSetting(0)
     annot_index = ContextSetting(0)
