@@ -2,18 +2,24 @@ import contextlib
 from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
-from Orange.widgets.utils.colorpalettes import LimitedDiscretePalette
 from scipy import sparse
+
+from shap import KernelExplainer, TreeExplainer
+from shap.utils import sample, hclust_ordering
+from shap.utils._legacy import kmeans
 
 from Orange.base import Model
 from Orange.data import Table, Domain, Variable
 from Orange.util import dummy_callback, wrap_callback
-from shap import KernelExplainer, TreeExplainer
-from shap.utils import sample
-from shap.utils._legacy import kmeans
+from Orange.widgets.utils.colorpalettes import LimitedDiscretePalette
 
 RGB_LOW = [0, 137, 229]
 RGB_HIGH = [255, 0, 66]
+
+ORIGINAL_ORDER = "Original instance ordering"
+OUTPUT_ORDER = "Order instances by output value"
+SIMILARITY_ORDER = "Order instances by similarity"
+INSTANCE_ORDERINGS = [ORIGINAL_ORDER, OUTPUT_ORDER, SIMILARITY_ORDER]
 
 
 @contextlib.contextmanager
@@ -545,10 +551,12 @@ def prepare_force_plot_data(
 
 
 def prepare_force_plot_data_multi_inst(
-    shap_values: List[np.ndarray],
-    base_value: np.ndarray,
-    target_class: int,
-    attributes: Tuple[Variable]
+        shap_values: List[np.ndarray],
+        base_value: np.ndarray,
+        predictions: np.ndarray,
+        target_class: int,
+        data: Table,
+        order_by: Union[str, Variable]
 ) -> Tuple[np.ndarray, List[Tuple[np.ndarray, np.ndarray]],
            List[Tuple[np.ndarray, np.ndarray]], List[str], List[str]]:
     """
@@ -562,11 +570,17 @@ def prepare_force_plot_data_multi_inst(
     base_value : np.ndarray
         An array of base values.
 
+    predictions : np.ndarray
+        An array of predictions.
+
     target_class : int
         Target class to plot.
 
-    attributes : tuple
-        Collection of transformed_data.domain.attributes.
+    data : Table
+        Transformed data.
+
+    order_by : str or Variable
+        Ordering type or variable.
 
     Returns
     -------
@@ -586,8 +600,27 @@ def prepare_force_plot_data_multi_inst(
         List of feature names for 'red' intervals.
 
     """
+    attributes = data.domain.attributes
     shap_values = shap_values[target_class]
     base_value = base_value[target_class]
+
+    if isinstance(order_by, Variable):
+        x_data = data.get_column_view(order_by)[0]
+        idxs = np.argsort(x_data)
+        x_data = x_data[idxs]
+        shap_values = shap_values[idxs]
+    elif order_by == ORIGINAL_ORDER:
+        x_data = np.arange(shap_values.shape[0])
+    elif order_by == OUTPUT_ORDER:
+        x_data = np.arange(shap_values.shape[0])
+        idxs = np.argsort(predictions[:, target_class])[::-1]
+        shap_values = shap_values[idxs]
+    elif order_by == SIMILARITY_ORDER:
+        x_data = np.arange(shap_values.shape[0])
+        idxs = hclust_ordering(shap_values)
+        shap_values = shap_values[idxs]
+    else:
+        raise NotImplementedError(order_by)
 
     exps = [(np.sum(shap_values[k, :]) + base_value, shap_values[k, :])
             for k in range(shap_values.shape[0])]
@@ -616,8 +649,6 @@ def prepare_force_plot_data_multi_inst(
 
         neg_labels.append(attributes[k].name)
 
-    x_data = np.arange(shap_values.shape[0])
-
     return x_data, pos_data, neg_data, pos_labels, neg_labels
 
 
@@ -637,8 +668,10 @@ if __name__ == "__main__":
     shap_values_, transformed_, _, base_value_ = \
         compute_shap_values(model_, table[:50], table)
     x_data_, pos_data_, neg_data_, pos_lab_, neg_lab_ = \
-        prepare_force_plot_data_multi_inst(shap_values_, base_value_, 0,
-                                           table.domain.attributes)
+        prepare_force_plot_data_multi_inst(
+            shap_values_, base_value_, None, 0,
+            transformed_, SIMILARITY_ORDER  # transformed_.domain["RM"]
+        )
 
     print(pos_lab_)
     print(neg_lab_)

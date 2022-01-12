@@ -21,7 +21,7 @@ from Orange.widgets.utils.sql import check_sql_input
 from Orange.widgets.utils.widgetpreview import WidgetPreview
 from Orange.widgets.widget import Input, Output, OWWidget, Msg
 from orangecontrib.explain.explainer import explain_predictions, \
-    prepare_force_plot_data_multi_inst, RGB_HIGH, RGB_LOW
+    prepare_force_plot_data_multi_inst, RGB_HIGH, RGB_LOW, INSTANCE_ORDERINGS
 
 
 class RunnerResults(SimpleNamespace):
@@ -121,9 +121,6 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
 
     graph_name = "graph.plotItem"
 
-    ORDERS = ["Original instance ordering",
-              "Order instances by output value",
-              "Order instances by similarity"]
     ANNOTATIONS = ["Enumeration"]
 
     def __init__(self):
@@ -158,7 +155,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
                                          callback=self.__on_order_changed,
                                          searchable=True, contentsLength=12)
         model = VariableListModel()
-        model[:] = self.ORDERS
+        model[:] = INSTANCE_ORDERINGS
         self._order_combo.setModel(model)
 
         box = gui.vBox(self.controlArea, "Annotation")
@@ -210,7 +207,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         self.annot_index = 0
         self._order_combo.clear()
         self._annot_combo.clear()
-        orders = self.ORDERS
+        orderings = INSTANCE_ORDERINGS
         annotations = self.ANNOTATIONS
 
         model = self.model
@@ -225,8 +222,8 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
                 raise NotImplementedError
 
             c_attrs = [a for a in model.domain.attributes if a.is_continuous]
-            orders = chain(
-                self.ORDERS,
+            orderings = chain(
+                INSTANCE_ORDERINGS,
                 [VariableListModel.Separator] if c_attrs else [],
                 c_attrs,
             )
@@ -241,7 +238,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
                 self.model.domain.attributes,
             )
 
-        self._order_combo.model()[:] = orders
+        self._order_combo.model()[:] = orderings
         self._annot_combo.model()[:] = annotations
 
     def handleNewSignals(self):
@@ -264,8 +261,10 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
             prepare_force_plot_data_multi_inst(
                 self.__results.values,
                 self.__results.base_value,
+                self.__results.predictions,
                 self.target_index,
-                self.__results.transformed_data.domain.attributes
+                self.__results.transformed_data,
+                self._order_combo.model()[self.order_index]
             )
 
         self.graph.set_data(x_data, pos_y_data, neg_y_data)

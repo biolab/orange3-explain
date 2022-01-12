@@ -21,7 +21,7 @@ from orangecontrib.explain.explainer import (
     explain_predictions,
     get_shap_values_and_colors,
     prepare_force_plot_data,
-    prepare_force_plot_data_multi_inst,
+    prepare_force_plot_data_multi_inst, INSTANCE_ORDERINGS,
 )
 
 
@@ -340,10 +340,13 @@ class TestExplainer(unittest.TestCase):
             # 3 instances, 4 features
             np.array([[1, -2, 6, 5], [-2, -3, -1, -5], [1, 2, 4, 5]])
         ]
+        predictions = np.array([[1, 0, 0], [1, 0, 0], [1, 0, 0]])
 
         x_data, pos_data, neg_data, pos_labels, neg_labels = \
-            prepare_force_plot_data_multi_inst(shap_values, base_value, 0,
-                                               self.iris.domain.attributes)
+            prepare_force_plot_data_multi_inst(
+                shap_values, base_value, predictions, 0,
+                self.iris[:3], INSTANCE_ORDERINGS[0]
+            )
 
         np.testing.assert_array_equal(x_data, np.arange(3))
         self.assertEqual(len(pos_data), 4)
@@ -363,6 +366,46 @@ class TestExplainer(unittest.TestCase):
             np.testing.assert_array_equal(pos_data[i][1], y2)
 
         for i, (y1, y2) in enumerate([([13, -8, 15], [15, -5, 15]),
+                                      ([15, -5, 15], [15, 0, 15]),
+                                      ([15, 0, 15], [15,  2, 15]),
+                                      ([15, 2, 15], [15, 3, 15])]):
+            np.testing.assert_array_equal(neg_data[i][0], y1)
+            np.testing.assert_array_equal(neg_data[i][1], y2)
+
+        self.assertEqual(len(pos_labels), 4)
+        self.assertEqual(len(neg_labels), 4)
+
+    def test_prepare_force_plot_data_multi_inst_order(self):
+        base_value = np.array([3])
+        shap_values = [
+            np.array([[1, -2, 6, 5], [-2, -3, -1, -5], [1, 2, 4, 5]])
+        ]
+        predictions = np.array([[1, 0, 0], [1, 0, 0], [1, 0, 0]])
+
+        x_data, pos_data, neg_data, pos_labels, neg_labels = \
+            prepare_force_plot_data_multi_inst(
+                shap_values, base_value, predictions, 0,
+                self.iris[:3], self.iris.domain[0]
+            )
+
+        np.testing.assert_array_equal(x_data, [4.7, 4.9, 5.1])
+        self.assertEqual(len(pos_data), 4)
+        self.assertEqual(len(neg_data), 4)
+        self.assertEqual(len(pos_data[0]), 2)
+        self.assertEqual(len(neg_data[0]), 2)
+
+        for i in range(len(pos_data) - 1):
+            np.testing.assert_array_equal(pos_data[i][1], pos_data[i + 1][0])
+            np.testing.assert_array_equal(neg_data[i][1], neg_data[i + 1][0])
+
+        for i, (y1, y2) in enumerate([([15, -8, 13], [10, -8, 8]),
+                                      ([10, -8, 8], [6, -8, 2]),
+                                      ([6, -8, 2], [4, -8, 2]),
+                                      ([4, -8, 2], [3, -8, 1])]):
+            np.testing.assert_array_equal(pos_data[i][0], y1)
+            np.testing.assert_array_equal(pos_data[i][1], y2)
+
+        for i, (y1, y2) in enumerate([([15, -8, 13], [15, -5, 15]),
                                       ([15, -5, 15], [15, 0, 15]),
                                       ([15, 0, 15], [15,  2, 15]),
                                       ([15, 2, 15], [15, 3, 15])]):

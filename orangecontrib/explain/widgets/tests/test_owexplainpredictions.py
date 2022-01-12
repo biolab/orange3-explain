@@ -11,6 +11,7 @@ from Orange.tests.test_classification import all_learners as all_cls_learners
 from Orange.tests.test_regression import all_learners as all_reg_learners, \
     init_learner as init_reg_learner
 from Orange.widgets.tests.utils import simulate
+from orangecontrib.explain.explainer import INSTANCE_ORDERINGS
 from orangecontrib.explain.widgets.owexplainpredictions import ForcePlot, \
     OWExplainPredictions
 from orangewidget.tests.base import WidgetTest
@@ -100,7 +101,11 @@ class TestOWExplainPredictions(WidgetTest):
         # 1 separator
         self.assertEqual(self.widget._order_combo.count(),
                          len(self.rf_cls.domain.attributes) + 1 +
-                         len(self.widget.ORDERS))
+                         len(INSTANCE_ORDERINGS))
+        self.send_signal(self.widget.Inputs.background_data, self.heart)
+        self.send_signal(self.widget.Inputs.data, self.heart[:10])
+        self.wait_until_finished()
+        simulate.combobox_run_through_all(self.widget._order_combo)
 
         self.send_signal(self.widget.Inputs.model, None)
         self.assertEqual(self.widget._order_combo.currentText(),
