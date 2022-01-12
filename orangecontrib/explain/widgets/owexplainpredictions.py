@@ -7,11 +7,13 @@ from AnyQt.QtCore import Qt
 
 import pyqtgraph as pg
 from Orange.base import Model
-from Orange.data import Table
+from Orange.data import Table, Domain, ContinuousVariable
 from Orange.data.table import DomainTransformationError
 from Orange.widgets import gui
 from Orange.widgets.settings import ContextSetting, Setting, \
     DomainContextHandler
+from Orange.widgets.utils.annotated_data import ANNOTATED_DATA_SIGNAL_NAME, \
+    create_annotated_table
 from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
 from Orange.widgets.utils.itemmodels import VariableListModel
 from Orange.widgets.utils.plot import OWPlotGUI
@@ -97,6 +99,8 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         data = Input("Data", Table)
 
     class Outputs:
+        selected_data = Output("Selected Data", Table, default=True)
+        annotated_data = Output(ANNOTATED_DATA_SIGNAL_NAME, Table)
         scores = Output("Scores", Table)
 
     class Error(OWWidget.Error):
@@ -129,6 +133,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         self.model: Optional[Model] = None
         self.background_data: Optional[Table] = None
         self.data: Optional[Table] = None
+        self.selection: List[int] = []
 
         self.setup_gui()
 
@@ -242,6 +247,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     def handleNewSignals(self):
         self.clear()
         self.start(run, self.data, self.background_data, self.model)
+        self.commit()
 
     def clear(self):
         self.__results = None
@@ -270,6 +276,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     def on_done(self, results):
         self.__results = results
         self.setup_plot()
+        self.output_scores()
 
     def on_exception(self, ex: Exception):
         if isinstance(ex, DomainTransformationError):
@@ -277,12 +284,26 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         else:
             self.Error.unknown_err(ex)
 
-    def commit(self):
-        pass
-
     def onDeleteWidget(self):
         self.shutdown()
         super().onDeleteWidget()
+
+    def commit(self):
+        selected = None
+        if self.data and self.selection:
+            selected = self.data[self.selection]
+        annotated = create_annotated_table(self.data, self.selection)
+        self.Outputs.selected_data.send(selected)
+        self.Outputs.annotated_data.send(annotated)
+
+    def output_scores(self):
+        scores = None
+        if self.__results is not None:
+            domain = self.__results.transformed_data.domain
+            scores = self.__results.values[self.target_index]
+            attrs = [ContinuousVariable(a.name) for a in domain.attributes]
+            scores = Table(Domain(attrs), scores)
+        self.Outputs.scores.send(scores)
 
     def send_report(self):
         if not self.data or not self.background_data or not self.model:

@@ -178,7 +178,8 @@ class TestOWExplainPredictions(WidgetTest):
 
         output = self.get_output(self.widget.Outputs.scores)
         self.assertIsInstance(output, Table)
-        self.assertEqual(True, False)
+        self.assertEqual(len(output), 10)
+        self.assertEqual(output.X.shape[1], len(self.rf_cls.domain.attributes))
 
         self.send_signal(self.widget.Inputs.model, None)
         self.assertIsNone(self.get_output(self.widget.Outputs.scores))
@@ -204,9 +205,17 @@ class TestOWExplainPredictions(WidgetTest):
 
         output = self.get_output(self.widget.Outputs.annotated_data)
         self.assertIsInstance(output, Table)
-        self.assertEqual(True, False)
+        self.assertEqual(len(output), 10)
 
         self.send_signal(self.widget.Inputs.model, None)
+        output = self.get_output(self.widget.Outputs.annotated_data)
+        self.assertIsInstance(output, Table)
+
+        self.send_signal(self.widget.Inputs.background_data, None)
+        output = self.get_output(self.widget.Outputs.annotated_data)
+        self.assertIsInstance(output, Table)
+
+        self.send_signal(self.widget.Inputs.data, None)
         self.assertIsNone(self.get_output(self.widget.Outputs.annotated_data))
 
     def test_saved_workflow(self):
