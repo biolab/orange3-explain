@@ -550,13 +550,34 @@ def prepare_force_plot_data(
     return selected_shap_values, segments, selected_labels, ranges
 
 
-def prepare_force_plot_data_multi_inst(
+def get_instance_ordering(
         shap_values: List[np.ndarray],
-        base_value: np.ndarray,
         predictions: np.ndarray,
         target_class: int,
         data: Table,
         order_by: Union[str, Variable]
+) -> np.ndarray:
+    shap_values = shap_values[target_class]
+    if isinstance(order_by, Variable):
+        x_data = data.get_column_view(order_by)[0]
+        return np.argsort(x_data)
+    elif order_by == ORIGINAL_ORDER:
+        return np.arange(shap_values.shape[0])
+    elif order_by == OUTPUT_ORDER:
+        return np.argsort(predictions[:, target_class])[::-1]
+    elif order_by == SIMILARITY_ORDER:
+        return hclust_ordering(shap_values)
+    else:
+        raise NotImplementedError(order_by)
+
+
+def prepare_force_plot_data_multi_inst(
+        shap_values: List[np.ndarray],
+        base_value: np.ndarray,
+        target_class: int,
+        data: Table,
+        order_by: Union[str, Variable],
+        order_idxs: np.ndarray
 ) -> Tuple[np.ndarray, List[Tuple[np.ndarray, np.ndarray]],
            List[Tuple[np.ndarray, np.ndarray]], List[str], List[str]]:
     """
@@ -570,9 +591,6 @@ def prepare_force_plot_data_multi_inst(
     base_value : np.ndarray
         An array of base values.
 
-    predictions : np.ndarray
-        An array of predictions.
-
     target_class : int
         Target class to plot.
 
@@ -581,6 +599,9 @@ def prepare_force_plot_data_multi_inst(
 
     order_by : str or Variable
         Ordering type or variable.
+
+    order_idxs : np.ndarray
+        Instance ordering indices.
 
     Returns
     -------
@@ -601,26 +622,12 @@ def prepare_force_plot_data_multi_inst(
 
     """
     attributes = data.domain.attributes
-    shap_values = shap_values[target_class]
+    shap_values = shap_values[target_class][order_idxs]
     base_value = base_value[target_class]
 
+    x_data = np.arange(shap_values.shape[0])
     if isinstance(order_by, Variable):
-        x_data = data.get_column_view(order_by)[0]
-        idxs = np.argsort(x_data)
-        x_data = x_data[idxs]
-        shap_values = shap_values[idxs]
-    elif order_by == ORIGINAL_ORDER:
-        x_data = np.arange(shap_values.shape[0])
-    elif order_by == OUTPUT_ORDER:
-        x_data = np.arange(shap_values.shape[0])
-        idxs = np.argsort(predictions[:, target_class])[::-1]
-        shap_values = shap_values[idxs]
-    elif order_by == SIMILARITY_ORDER:
-        x_data = np.arange(shap_values.shape[0])
-        idxs = hclust_ordering(shap_values)
-        shap_values = shap_values[idxs]
-    else:
-        raise NotImplementedError(order_by)
+        x_data = data.get_column_view(order_by)[0][order_idxs]
 
     exps = [(np.sum(shap_values[k, :]) + base_value, shap_values[k, :])
             for k in range(shap_values.shape[0])]
@@ -667,10 +674,15 @@ if __name__ == "__main__":
 
     shap_values_, transformed_, _, base_value_ = \
         compute_shap_values(model_, table[:50], table)
+
+    idxs = get_instance_ordering(shap_values_, None, 0,
+                                 transformed_, SIMILARITY_ORDER)
+
     x_data_, pos_data_, neg_data_, pos_lab_, neg_lab_ = \
         prepare_force_plot_data_multi_inst(
-            shap_values_, base_value_, None, 0,
-            transformed_, SIMILARITY_ORDER  # transformed_.domain["RM"]
+            shap_values_, base_value_, 0,
+            transformed_, SIMILARITY_ORDER,  # transformed_.domain["RM"]
+            idxs
         )
 
     print(pos_lab_)

@@ -19,9 +19,11 @@ from orangecontrib.explain.explainer import (
     compute_colors,
     compute_shap_values,
     explain_predictions,
+    INSTANCE_ORDERINGS,
+    get_instance_ordering,
     get_shap_values_and_colors,
     prepare_force_plot_data,
-    prepare_force_plot_data_multi_inst, INSTANCE_ORDERINGS,
+    prepare_force_plot_data_multi_inst,
 )
 
 
@@ -342,10 +344,13 @@ class TestExplainer(unittest.TestCase):
         ]
         predictions = np.array([[1, 0, 0], [1, 0, 0], [1, 0, 0]])
 
+        idxs = get_instance_ordering(
+            shap_values, predictions, 0, self.iris[:3], INSTANCE_ORDERINGS[0])
+
         x_data, pos_data, neg_data, pos_labels, neg_labels = \
             prepare_force_plot_data_multi_inst(
-                shap_values, base_value, predictions, 0,
-                self.iris[:3], INSTANCE_ORDERINGS[0]
+                shap_values, base_value, 0,
+                self.iris[:3], INSTANCE_ORDERINGS[0], idxs
             )
 
         np.testing.assert_array_equal(x_data, np.arange(3))
@@ -382,10 +387,13 @@ class TestExplainer(unittest.TestCase):
         ]
         predictions = np.array([[1, 0, 0], [1, 0, 0], [1, 0, 0]])
 
+        idxs = get_instance_ordering(
+            shap_values, predictions, 0, self.iris[:3], self.iris.domain[0])
+
         x_data, pos_data, neg_data, pos_labels, neg_labels = \
             prepare_force_plot_data_multi_inst(
-                shap_values, base_value, predictions, 0,
-                self.iris[:3], self.iris.domain[0]
+                shap_values, base_value, 0,
+                self.iris[:3], self.iris.domain[0], idxs
             )
 
         np.testing.assert_array_equal(x_data, [4.7, 4.9, 5.1])

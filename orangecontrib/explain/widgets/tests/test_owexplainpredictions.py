@@ -1,6 +1,11 @@
 # pylint: disable=missing-docstring
 import unittest
 from typing import Type
+from unittest.mock import Mock
+
+import numpy as np
+
+from AnyQt.QtCore import QPointF, Qt
 
 from Orange.base import Learner
 from Orange.classification import RandomForestLearner, CalibratedLearner, \
@@ -21,6 +26,58 @@ def init_learner(learner: Type[Learner], table: Table) -> Learner:
     if learner in (CalibratedLearner, ThresholdLearner):
         return CalibratedLearner(RandomForestLearner())
     return init_reg_learner(learner, table)
+
+
+class TestForcePlot(WidgetTest):
+    def setUp(self):
+        widget = self.create_widget(OWExplainPredictions)
+        self.plot = ForcePlot(widget)
+
+    def test_zoom_select(self):
+        self.plot.select_button_clicked()
+        self.plot.pan_button_clicked()
+        self.plot.zoom_button_clicked()
+        self.plot.reset_button_clicked()
+
+    def test_selection(self):
+        selection_handler = Mock()
+
+        view_box = self.plot.getViewBox()
+        self.plot.selectionChanged.connect(selection_handler)
+
+        event = Mock()
+        event.button.return_value = Qt.LeftButton
+        event.buttonDownPos.return_value = QPointF(10, 0)
+        event.pos.return_value = QPointF(30, 0)
+        event.isFinish.return_value = True
+
+        # select before data is sent
+        view_box.mouseDragEvent(event)
+
+        # set data
+        x_data = np.arange(5)
+        pos_y_data = [(np.arange(5) - 1, np.arange(5))]
+        neg_y_data = [(np.arange(5), np.arange(5) + 1)]
+        self.plot.set_data(x_data, pos_y_data, neg_y_data)
+
+        # select after data is sent
+        view_box.mouseDragEvent(event)
+        selection_handler.assert_called_once()
+
+        # select other instances
+        event.buttonDownPos.return_value = QPointF(40, 0)
+        event.pos.return_value = QPointF(60, 0)
+
+        selection_handler.reset_mock()
+        view_box.mouseDragEvent(event)
+        selection_handler.assert_called_once()
+        self.assertEqual(len(selection_handler.call_args[0][0]), 2)
+
+        # click on the plot resets selection
+        selection_handler.reset_mock()
+        view_box.mouseClickEvent(event)
+        selection_handler.assert_called_once()
+        self.assertEqual(len(selection_handler.call_args[0][0]), 0)
 
 
 class TestOWExplainPredictions(WidgetTest):
@@ -157,11 +214,28 @@ class TestOWExplainPredictions(WidgetTest):
     def test_plot_tooltip(self):
         self.assertEqual(True, False)
 
-    def test_plot_zoom_select(self):
-        self.assertEqual(True, False)
-
     def test_plot_multiple_selection(self):
-        self.assertEqual(True, False)
+        self.send_signal(self.widget.Inputs.data, self.heart[:10])
+        self.send_signal(self.widget.Inputs.background_data, self.heart)
+        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+        self.wait_until_finished()
+
+        event = Mock()
+        event.button.return_value = Qt.LeftButton
+        event.buttonDownPos.return_value = QPointF(10, 0)
+        event.pos.return_value = QPointF(30, 0)
+        event.isFinish.return_value = True
+        self.widget.graph.getViewBox().mouseDragEvent(event)
+
+        output = self.get_output(self.widget.Outputs.selected_data)
+        self.assertEqual(len(output), 4)
+
+        event.buttonDownPos.return_value = QPointF(40, 0)
+        event.pos.return_value = QPointF(50, 0)
+        self.widget.graph.getViewBox().mouseDragEvent(event)
+
+        output = self.get_output(self.widget.Outputs.selected_data)
+        self.assertEqual(len(output), 5)
 
     def test_all_models(self):
         def run(data):
@@ -196,9 +270,16 @@ class TestOWExplainPredictions(WidgetTest):
         self.send_signal(self.widget.Inputs.model, self.rf_cls)
         self.wait_until_finished()
 
+        event = Mock()
+        event.button.return_value = Qt.LeftButton
+        event.buttonDownPos.return_value = QPointF(10, 0)
+        event.pos.return_value = QPointF(30, 0)
+        event.isFinish.return_value = True
+        self.widget.graph.getViewBox().mouseDragEvent(event)
+
         output = self.get_output(self.widget.Outputs.selected_data)
         self.assertIsInstance(output, Table)
-        self.assertEqual(True, False)
+        self.assertEqual(len(output), 4)
 
         self.send_signal(self.widget.Inputs.model, None)
         self.assertIsNone(self.get_output(self.widget.Outputs.selected_data))
