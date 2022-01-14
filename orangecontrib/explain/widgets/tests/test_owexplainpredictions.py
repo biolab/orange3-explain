@@ -330,8 +330,36 @@ class TestOWExplainPredictions(WidgetTest):
         self.assertEqual(self.widget.order_index, 4)
         self.assertEqual(self.widget.annot_index, 2)
 
-    def test_saved_workflow(self):
-        self.assertEqual(True, False)
+    def test_saved_selection(self):
+        self.send_signal(self.widget.Inputs.data, self.heart[:10])
+        self.send_signal(self.widget.Inputs.background_data, self.heart)
+        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+        self.wait_until_finished()
+
+        event = Mock()
+        event.button.return_value = Qt.LeftButton
+        event.buttonDownPos.return_value = QPointF(10, 0)
+        event.pos.return_value = QPointF(30, 0)
+        event.isFinish.return_value = True
+        self.widget.graph.getViewBox().mouseDragEvent(event)
+
+        event.buttonDownPos.return_value = QPointF(40, 0)
+        event.pos.return_value = QPointF(50, 0)
+        self.widget.graph.getViewBox().mouseDragEvent(event)
+
+        output = self.get_output(self.widget.Outputs.selected_data)
+        self.assertEqual(len(output), 5)
+
+        settings = self.widget.settingsHandler.pack_data(self.widget)
+
+        w = self.create_widget(OWExplainPredictions, stored_settings=settings)
+        self.send_signal(w.Inputs.data, self.heart[:10], widget=w)
+        self.send_signal(w.Inputs.background_data, self.heart, widget=w)
+        self.send_signal(w.Inputs.model, self.rf_cls, widget=w)
+        self.wait_until_finished()
+
+        output = self.get_output(w.Outputs.selected_data, widget=w)
+        self.assertEqual(len(output), 5)
 
     def test_visual_settings(self):
         self.assertEqual(True, False)

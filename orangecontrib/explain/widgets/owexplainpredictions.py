@@ -188,19 +188,31 @@ class ForcePlot(pg.PlotWidget):
         self.__selection_rect_items.clear()
 
     def _update_selection(self, p1: QPointF, p2: QPointF):
+        self.__select_range(p1, p2)
+        self.selectionChanged.emit(self.__selection)
+
+    def __select_range(self, p1: QPointF, p2: QPointF):
         rect = QRectF(p1, p2).normalized()
         self.__selection.append((rect.topLeft().x(), rect.topRight().x()))
 
         sel_rect_item = SelectionRect(rect)
         self.addItem(sel_rect_item)
         self.__selection_rect_items.append(sel_rect_item)
-        self.selectionChanged.emit(self.__selection)
 
     def _deselect(self):
         selection_existed = bool(self.__selection)
         self._clear_selection()
         if selection_existed:
             self.selectionChanged.emit([])
+
+    def apply_selection(self, selection: List[Tuple[float, float]]):
+        (x_min, x_max), (y_min, y_max) = self.__data_bounds
+        for x_start, x_stop in selection:
+            p1 = QPointF(x_start, y_min)
+            p2 = QPointF(x_stop, y_max)
+            p1.setX(max(min(p1.x(), x_max), x_min))
+            p2.setX(max(min(p2.x(), x_max), x_min))
+            self.__select_range(p1, p2)
 
     def select_button_clicked(self):
         self.getViewBox().set_state(SELECT)
@@ -252,7 +264,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     target_index = ContextSetting(0)
     order_index = ContextSetting(0)
     annot_index = ContextSetting(0)
-    selection = Setting([], schema_only=True)
+    selection_ranges = Setting([], schema_only=True)
     auto_send = Setting(True)
 
     graph_name = "graph.plotItem"
@@ -268,7 +280,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         self.data: Optional[Table] = None
         # cached instance indices after instance ordering
         self.__data_idxs: Optional[np.ndarray] = None
-        self.__pending_selection: List[int] = self.selection
+        self.__pending_selection: List[int] = self.selection_ranges
 
         self.setup_gui()
 
@@ -284,24 +296,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         box.layout().addWidget(self.graph)
 
     def __on_selection_changed(self, selection: List[Tuple[float, float]]):
-        ordering = self._order_combo.model()[self.order_index]
-
-        if ordering in INSTANCE_ORDERINGS:
-            selection = list(set(
-                chain.from_iterable(
-                    range(int(np.ceil(start)), int(np.floor(stop) + 1))
-                    for start, stop in selection)
-            ))
-            self.selection = sorted(self.__data_idxs[selection])
-
-        else:  # variable
-            data = self.__results.transformed_data
-            column = data.get_column_view(ordering)[0]
-            mask = np.zeros((len(column)), dtype=bool)
-            for start, stop in selection:
-                mask |= (start <= column) & (column <= stop)
-            self.selection = list(np.flatnonzero(mask))
-
+        self.selection_ranges = selection
         self.commit()
 
     def _add_controls(self):
@@ -329,13 +324,18 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         gui.rubber(self.controlArea)
 
     def __on_target_changed(self):
+        self.selection_ranges = []
         self.setup_plot()
+        self.commit()
 
     def __on_order_changed(self):
+        self.selection_ranges_ranges = []
         self.setup_plot()
+        self.commit()
 
     def __on_annot_changed(self):
         self.setup_plot()
+        self.graph.apply_selection(self.selection_ranges)
 
     def _add_buttons(self):
         plot_gui = OWPlotGUI(self)
@@ -410,7 +410,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         self.__results = None
         self.cancel()
         self.clear_messages()
-        self.selection = []
+        self.selection_ranges = []
         self.graph.clear_all()
         self.__data_idxs = None
 
@@ -446,6 +446,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     def on_done(self, results):
         self.__results = results
         self.setup_plot()
+        self.apply_selection()
         self.output_scores()
 
     def on_exception(self, ex: Exception):
@@ -458,11 +459,39 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         self.shutdown()
         super().onDeleteWidget()
 
+    def apply_selection(self):
+        selection_ranges = self.selection_ranges or self.__pending_selection
+        if selection_ranges:
+            self.graph.apply_selection(selection_ranges)
+            self.__on_selection_changed(selection_ranges)
+            self.__pending_selection = []
+
     def commit(self):
         selected = None
-        if self.data and self.selection:
-            selected = self.data[self.selection]
-        annotated = create_annotated_table(self.data, self.selection)
+        selected_indices = []
+
+        if self.__results:
+            ordering = self._order_combo.model()[self.order_index]
+
+            if ordering in INSTANCE_ORDERINGS:
+                selection = list(set(
+                    chain.from_iterable(
+                        range(int(np.ceil(start)), int(np.floor(stop) + 1))
+                        for start, stop in self.selection_ranges)
+                ))
+                selected_indices = sorted(self.__data_idxs[selection])
+
+            else:  # variable
+                data = self.__results.transformed_data
+                column = data.get_column_view(ordering)[0]
+                mask = np.zeros((len(column)), dtype=bool)
+                for start, stop in self.selection_ranges:
+                    mask |= (start <= column) & (column <= stop)
+                selected_indices = list(np.flatnonzero(mask))
+
+        if self.data and selected_indices:
+            selected = self.data[selected_indices]
+        annotated = create_annotated_table(self.data, selected_indices)
         self.Outputs.selected_data.send(selected)
         self.Outputs.annotated_data.send(annotated)
 
