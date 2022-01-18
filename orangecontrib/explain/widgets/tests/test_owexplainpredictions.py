@@ -1,11 +1,11 @@
 # pylint: disable=missing-docstring
 import unittest
 from typing import Type
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import numpy as np
-
 from AnyQt.QtCore import QPointF, Qt
+from AnyQt.QtWidgets import QToolTip
 
 from Orange.base import Learner
 from Orange.classification import RandomForestLearner, CalibratedLearner, \
@@ -32,6 +32,7 @@ class TestForcePlot(WidgetTest):
     def setUp(self):
         widget = self.create_widget(OWExplainPredictions)
         self.plot = ForcePlot(widget)
+        self.housing = Table("housing")
 
     def test_zoom_select(self):
         self.plot.select_button_clicked()
@@ -58,7 +59,7 @@ class TestForcePlot(WidgetTest):
         x_data = np.arange(5)
         pos_y_data = [(np.arange(5) - 1, np.arange(5))]
         neg_y_data = [(np.arange(5), np.arange(5) + 1)]
-        self.plot.set_data(x_data, pos_y_data, neg_y_data)
+        self.plot.set_data(x_data, pos_y_data, neg_y_data, self.housing, None)
 
         # select after data is sent
         view_box.mouseDragEvent(event)
@@ -78,6 +79,37 @@ class TestForcePlot(WidgetTest):
         view_box.mouseClickEvent(event)
         selection_handler.assert_called_once()
         self.assertEqual(len(selection_handler.call_args[0][0]), 0)
+
+    @patch.object(QToolTip, "showText")
+    def test_tooltip(self, show_text: Mock):
+        event = Mock()
+        point = self.plot.getViewBox().mapViewToScene(QPointF(1, 2))
+        event.scenePos.return_value = point
+        self.plot.help_event(event)
+        self.assertIsNone(show_text.call_args)
+
+        x_data = np.arange(5)
+        pos_y_data = [(np.arange(5) - 1, np.arange(5))]
+        neg_y_data = [(np.arange(5), np.arange(5) + 1)]
+        self.plot.set_data(x_data, pos_y_data, neg_y_data,
+                           self.housing[:5, :2], None)
+
+        event = Mock()
+        point = self.plot.getViewBox().mapViewToScene(QPointF(1, 2))
+        event.scenePos.return_value = point
+        self.plot.help_event(event)
+        self.assertEqual(show_text.call_args[0][1],
+                         "CRIM = 0.02731 <br/>ZN = 0.0 <br/>")
+
+        self.plot.set_data(self.housing.X[:5, 0], pos_y_data, neg_y_data,
+                           self.housing[:5, :2], self.housing.domain[0])
+
+        event = Mock()
+        point = self.plot.getViewBox().mapViewToScene(QPointF(1, 2))
+        event.scenePos.return_value = point
+        self.plot.help_event(event)
+        self.assertEqual(show_text.call_args[0][1],
+                         "CRIM = 0.06905 <br/>ZN = 0.0 <br/>")
 
 
 class TestOWExplainPredictions(WidgetTest):
@@ -210,9 +242,6 @@ class TestOWExplainPredictions(WidgetTest):
 
         self.send_signal(self.widget.Inputs.data, None)
         self.assertPlotEmpty(self.widget.graph)
-
-    def test_plot_tooltip(self):
-        self.assertEqual(True, False)
 
     def test_plot_multiple_selection(self):
         self.send_signal(self.widget.Inputs.data, self.heart[:10])

@@ -5,7 +5,7 @@ from typing import Optional, List, Tuple
 import numpy as np
 from AnyQt.QtCore import QPointF, Qt, Signal, QRectF
 from AnyQt.QtGui import QTransform, QPainter
-
+from AnyQt.QtWidgets import QToolTip, QGraphicsSceneHelpEvent
 import pyqtgraph as pg
 from pyqtgraph.GraphicsScene.mouseEvents import MouseClickEvent, MouseDragEvent
 
@@ -22,6 +22,7 @@ from Orange.widgets.utils.itemmodels import VariableListModel
 from Orange.widgets.utils.plot import OWPlotGUI, SELECT, PANNING, ZOOMING
 from Orange.widgets.utils.sql import check_sql_input
 from Orange.widgets.utils.widgetpreview import WidgetPreview
+from Orange.widgets.visualize.utils.plotutils import HelpEventDelegate
 from Orange.widgets.widget import Input, Output, OWWidget, Msg
 from orangecontrib.explain.explainer import explain_predictions, \
     prepare_force_plot_data_multi_inst, RGB_HIGH, RGB_LOW, \
@@ -137,6 +138,11 @@ class ForcePlot(pg.PlotWidget):
     def __init__(self, parent: OWWidget):
         self.__data_bounds: Optional[Tuple[Tuple[float, float],
                                            Tuple[float, float]]] = None
+
+        self.__x_data: Optional[np.ndarray] = None
+        self.__tooltip_data: Optional[Table] = None
+        self.__order_var: Optional[ContinuousVariable] = None
+
         self.__selection: List = []
         self.__selection_rect_items: List[SelectionRect] = []
 
@@ -152,11 +158,21 @@ class ForcePlot(pg.PlotWidget):
         self.getPlotItem().setContentsMargins(10, 10, 10, 10)
         self.getPlotItem().buttonsHidden = True
 
+        self._tooltip_delegate = HelpEventDelegate(self.help_event)
+        self.scene().installEventFilter(self._tooltip_delegate)
+
     def set_data(self, x_data: np.ndarray,
                  pos_y_data: List[Tuple[np.ndarray, np.ndarray]],
-                 neg_y_data: List[Tuple[np.ndarray, np.ndarray]]):
+                 neg_y_data: List[Tuple[np.ndarray, np.ndarray]],
+                 tooltip_data: Table, order_var: Optional[ContinuousVariable]):
+
         self.__data_bounds = ((np.nanmin(x_data), np.nanmax(x_data)),
                               (np.nanmin(pos_y_data), np.nanmax(neg_y_data)))
+
+        self.__x_data = x_data
+        self.__tooltip_data = tooltip_data
+        self.__order_var = order_var
+
         self.getViewBox().set_data_bounds(self.__data_bounds)
         self._set_range()
         self._plot_data(x_data, pos_y_data, neg_y_data)
@@ -177,6 +193,9 @@ class ForcePlot(pg.PlotWidget):
 
     def clear_all(self):
         self.__data_bounds = None
+        self.__x_data = None
+        self.__tooltip_data = None
+        self.__order_var = None
         self.getViewBox().set_data_bounds(self.__data_bounds)
         self.clear()
         self._clear_selection()
@@ -231,6 +250,26 @@ class ForcePlot(pg.PlotWidget):
         view_box: ForcePlotViewBox = self.getViewBox()
         view_box.setXRange(*x_range, padding=0)
         view_box.setYRange(*y_range, padding=0.1)
+
+    def help_event(self, event: QGraphicsSceneHelpEvent) -> bool:
+        if self.__tooltip_data is None:
+            return False
+
+        point: QPointF = self.getViewBox().mapSceneToView(event.scenePos())
+        value = point.x()
+
+        if self.__order_var is not None:
+            index = (np.abs(self.__x_data - value)).argmin()
+        else:
+            index = int(round(value, 0))
+
+        if 0 <= index < len(self.__tooltip_data):
+            row = self.__tooltip_data[index]
+            text = "".join([f"{a.name} = {row[a]} <br/>" for a in
+                            self.__tooltip_data.domain.attributes])
+            QToolTip.showText(event.screenPos(), text, widget=self)
+            return True
+        return False
 
 
 class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
@@ -438,7 +477,11 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
                 self.__data_idxs
             )
 
-        self.graph.set_data(x_data, pos_y_data, neg_y_data)
+        tooltip_data = self.__results.transformed_data[self.__data_idxs]
+        var = self._order_combo.model()[self.order_index]
+        if not isinstance(var, ContinuousVariable):
+            var = None
+        self.graph.set_data(x_data, pos_y_data, neg_y_data, tooltip_data, var)
 
     def on_partial_result(self, _):
         pass
