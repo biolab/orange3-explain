@@ -207,14 +207,49 @@ class TestOWExplainPredictions(WidgetTest):
 
         self.send_signal(self.widget.Inputs.model, self.rf_reg)
         self.assertEqual(self.widget._annot_combo.currentText(), "Enumeration")
-        # 2 separators
-        self.assertEqual(self.widget._annot_combo.count(),
-                         len(self.rf_reg.domain) + 2 +
-                         len(self.widget.ANNOTATIONS))
+        self.assertEqual(self.widget._annot_combo.count(), 1)
+
+        self.send_signal(self.widget.Inputs.background_data, self.heart)
+        self.send_signal(self.widget.Inputs.data, self.heart[:5])
+        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+        self.assertEqual(self.widget._annot_combo.currentText(), "Enumeration")
+        self.assertEqual(self.widget._annot_combo.count(), 3)
+        self.wait_until_finished()
+
+        self.widget.graph.set_axis = Mock()
+        simulate.combobox_activate_index(self.widget._annot_combo, 2)
+        args = ([[(0, "0"), (1, "1"), (2, "1"), (3, "0"), (4, "0")]], True)
+        self.widget.graph.set_axis.assert_called_once_with(*args)
+
+        self.widget.graph.set_axis.reset_mock()
+        simulate.combobox_activate_index(self.widget._annot_combo, 0)
+        args = (None, False)
+        self.widget.graph.set_axis.assert_called_once_with(*args)
 
         self.send_signal(self.widget.Inputs.model, None)
         self.assertEqual(self.widget._annot_combo.currentText(), "Enumeration")
         self.assertEqual(self.widget._annot_combo.count(), 1)
+
+    def test_setup_plot(self):
+        self.widget.graph.set_data = Mock()
+        self.widget.graph.set_axis = Mock()
+
+        self.send_signal(self.widget.Inputs.background_data, self.heart)
+        self.send_signal(self.widget.Inputs.data, self.heart[:5])
+        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+        self.wait_until_finished()
+
+        simulate.combobox_activate_index(self.widget._annot_combo, 2)
+        self.widget.graph.set_data.assert_called_once()
+        args = ([[(0, "0"), (1, "1"), (2, "1"), (3, "0"), (4, "0")]], True)
+        self.widget.graph.set_axis.assert_called_once_with(*args)
+
+        self.widget.graph.set_data.reset_mock()
+        self.widget.graph.set_axis.reset_mock()
+        simulate.combobox_activate_index(self.widget._order_combo, 4)
+        self.widget.graph.set_data.assert_called_once()
+        args = ([[(0, "0"), (1, "0"), (2, "0"), (3, "1"), (4, "1")]], True)
+        self.widget.graph.set_axis.assert_called_once_with(*args)
 
     def test_plot(self):
         self.send_signal(self.widget.Inputs.data, self.heart)

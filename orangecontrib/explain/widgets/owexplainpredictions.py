@@ -10,7 +10,7 @@ import pyqtgraph as pg
 from pyqtgraph.GraphicsScene.mouseEvents import MouseClickEvent, MouseDragEvent
 
 from Orange.base import Model
-from Orange.data import Table, Domain, ContinuousVariable
+from Orange.data import Table, Domain, ContinuousVariable, Variable
 from Orange.data.table import DomainTransformationError
 from Orange.widgets import gui
 from Orange.widgets.settings import ContextSetting, Setting, \
@@ -22,7 +22,8 @@ from Orange.widgets.utils.itemmodels import VariableListModel
 from Orange.widgets.utils.plot import OWPlotGUI, SELECT, PANNING, ZOOMING
 from Orange.widgets.utils.sql import check_sql_input
 from Orange.widgets.utils.widgetpreview import WidgetPreview
-from Orange.widgets.visualize.utils.plotutils import HelpEventDelegate
+from Orange.widgets.visualize.utils.plotutils import HelpEventDelegate, \
+    AxisItem
 from Orange.widgets.widget import Input, Output, OWWidget, Msg
 from orangecontrib.explain.explainer import explain_predictions, \
     prepare_force_plot_data_multi_inst, RGB_HIGH, RGB_LOW, \
@@ -152,8 +153,8 @@ class ForcePlot(pg.PlotWidget):
 
         super().__init__(parent, viewBox=view_box,
                          background="w", enableMenu=False,
-                         axisItems={"bottom": pg.AxisItem("bottom"),
-                                    "left": pg.AxisItem("left")})
+                         axisItems={"bottom": AxisItem("bottom"),
+                                    "left": AxisItem("left")})
         self.setAntialiasing(True)
         self.getPlotItem().setContentsMargins(10, 10, 10, 10)
         self.getPlotItem().buttonsHidden = True
@@ -190,6 +191,11 @@ class ForcePlot(pg.PlotWidget):
                     pg.PlotDataItem(x=x_data, y=y_top), pen=pen, brush=brush
                 )
                 self.addItem(fill)
+
+    def set_axis(self, ticks: Optional[List], rotate: bool):
+        ax: AxisItem = self.getAxis("bottom")
+        ax.setTicks(ticks)
+        ax.setRotateTicks(rotate)
 
     def clear_all(self):
         self.__data_bounds = None
@@ -258,7 +264,7 @@ class ForcePlot(pg.PlotWidget):
         point: QPointF = self.getViewBox().mapSceneToView(event.scenePos())
         value = point.x()
 
-        if self.__order_var is not None:
+        if isinstance(self.__order_var, ContinuousVariable):
             index = (np.abs(self.__x_data - value)).argmin()
         else:
             index = int(round(value, 0))
@@ -373,8 +379,14 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         self.commit()
 
     def __on_annot_changed(self):
-        self.setup_plot()
-        self.graph.apply_selection(self.selection_ranges)
+        if self.__results:
+            annot_var = self._annot_combo.model()[self.annot_index]
+            if isinstance(annot_var, Variable):
+                data = self.__results.transformed_data[self.__data_idxs]
+                ticks = [[(i, row[annot_var].value) for i, row in enumerate(data)]]
+                self.graph.set_axis(ticks, True)
+            else:
+                self.graph.set_axis(None, False)
 
     def _add_buttons(self):
         plot_gui = OWPlotGUI(self)
@@ -427,14 +439,17 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
                 c_attrs,
             )
 
+            attrs = [a for a in model.domain.attributes if not a.is_continuous]
+            cvars = [c for c in model.domain.class_vars if not c.is_continuous]
+            metas = [m for m in model.domain.metas if not m.is_continuous]
             annotations = chain(
                 self.ANNOTATIONS,
-                [VariableListModel.Separator] if model.domain.metas else [],
-                self.model.domain.metas,
-                [VariableListModel.Separator],
-                self.model.domain.class_vars,
-                [VariableListModel.Separator],
-                self.model.domain.attributes,
+                [VariableListModel.Separator] if metas else [],
+                metas,
+                [VariableListModel.Separator] if cvars else [],
+                cvars,
+                [VariableListModel.Separator] if attrs else [],
+                attrs,
             )
 
         self._order_combo.model()[:] = orderings
@@ -477,11 +492,14 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
                 self.__data_idxs
             )
 
-        tooltip_data = self.__results.transformed_data[self.__data_idxs]
-        var = self._order_combo.model()[self.order_index]
-        if not isinstance(var, ContinuousVariable):
-            var = None
-        self.graph.set_data(x_data, pos_y_data, neg_y_data, tooltip_data, var)
+        data = self.__results.transformed_data[self.__data_idxs]
+        order_var = self._order_combo.model()[self.order_index]
+        annot_var = self._annot_combo.model()[self.annot_index]
+
+        self.graph.set_data(x_data, pos_y_data, neg_y_data, data, order_var)
+        if isinstance(annot_var, Variable):
+            ticks = [[(i, row[annot_var].value) for i, row in enumerate(data)]]
+            self.graph.set_axis(ticks, True)
 
     def on_partial_result(self, _):
         pass
