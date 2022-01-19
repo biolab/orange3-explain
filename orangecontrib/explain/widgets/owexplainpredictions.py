@@ -140,10 +140,7 @@ class ForcePlot(pg.PlotWidget):
     def __init__(self, parent: OWWidget):
         self.__data_bounds: Optional[Tuple[Tuple[float, float],
                                            Tuple[float, float]]] = None
-
-        self.__x_data: Optional[np.ndarray] = None
         self.__tooltip_data: Optional[Table] = None
-        self.__order_var: Optional[ContinuousVariable] = None
 
         self.__selection: List = []
         self.__selection_rect_items: List[SelectionRect] = []
@@ -166,14 +163,11 @@ class ForcePlot(pg.PlotWidget):
     def set_data(self, x_data: np.ndarray,
                  pos_y_data: List[Tuple[np.ndarray, np.ndarray]],
                  neg_y_data: List[Tuple[np.ndarray, np.ndarray]],
-                 tooltip_data: Table, order_var: Optional[ContinuousVariable]):
+                 tooltip_data: Table):
 
         self.__data_bounds = ((np.nanmin(x_data), np.nanmax(x_data)),
                               (np.nanmin(pos_y_data), np.nanmax(neg_y_data)))
-
-        self.__x_data = x_data
         self.__tooltip_data = tooltip_data
-        self.__order_var = order_var
 
         self.getViewBox().set_data_bounds(self.__data_bounds)
         self._set_range()
@@ -200,9 +194,7 @@ class ForcePlot(pg.PlotWidget):
 
     def clear_all(self):
         self.__data_bounds = None
-        self.__x_data = None
         self.__tooltip_data = None
-        self.__order_var = None
         self.getViewBox().set_data_bounds(self.__data_bounds)
         self.clear()
         self._clear_selection()
@@ -263,12 +255,7 @@ class ForcePlot(pg.PlotWidget):
             return False
 
         point: QPointF = self.getViewBox().mapSceneToView(event.scenePos())
-        value = point.x()
-
-        if isinstance(self.__order_var, ContinuousVariable):
-            index = (np.abs(self.__x_data - value)).argmin()
-        else:
-            index = int(round(value, 0))
+        index = int(round(point.x(), 0))
 
         if 0 <= index < len(self.__tooltip_data):
             text = self._instance_tooltip(self.__tooltip_data.domain,
@@ -503,14 +490,11 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
                 self.__results.base_value,
                 self.target_index,
                 self.__results.transformed_data,
-                self._order_combo.model()[self.order_index],
                 self.__data_idxs
             )
 
-        data = self.__results.transformed_data[self.__data_idxs]
-        order_var = self._order_combo.model()[self.order_index]
-
-        self.graph.set_data(x_data, pos_y_data, neg_y_data, data, order_var)
+        self.graph.set_data(x_data, pos_y_data, neg_y_data,
+                            self.data[self.__data_idxs])
         self._set_plot_annotations()
 
     def _set_plot_annotations(self):

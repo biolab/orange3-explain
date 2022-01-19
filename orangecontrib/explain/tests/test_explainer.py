@@ -349,8 +349,7 @@ class TestExplainer(unittest.TestCase):
 
         x_data, pos_data, neg_data, pos_labels, neg_labels = \
             prepare_force_plot_data_multi_inst(
-                shap_values, base_value, 0,
-                self.iris[:3], INSTANCE_ORDERINGS[2], idxs
+                shap_values, base_value, 0, self.iris[:3], idxs
             )
 
         np.testing.assert_array_equal(x_data, np.arange(3))
@@ -392,11 +391,10 @@ class TestExplainer(unittest.TestCase):
 
         x_data, pos_data, neg_data, pos_labels, neg_labels = \
             prepare_force_plot_data_multi_inst(
-                shap_values, base_value, 0,
-                self.iris[:3], self.iris.domain[0], idxs
+                shap_values, base_value, 0, self.iris[:3], idxs
             )
 
-        np.testing.assert_array_equal(x_data, [4.7, 4.9, 5.1])
+        np.testing.assert_array_equal(x_data, np.arange(3))
         self.assertEqual(len(pos_data), 4)
         self.assertEqual(len(neg_data), 4)
         self.assertEqual(len(pos_data[0]), 2)

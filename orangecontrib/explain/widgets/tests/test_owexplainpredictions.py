@@ -59,7 +59,7 @@ class TestForcePlot(WidgetTest):
         x_data = np.arange(5)
         pos_y_data = [(np.arange(5) - 1, np.arange(5))]
         neg_y_data = [(np.arange(5), np.arange(5) + 1)]
-        self.plot.set_data(x_data, pos_y_data, neg_y_data, self.housing, None)
+        self.plot.set_data(x_data, pos_y_data, neg_y_data, self.housing)
 
         # select after data is sent
         view_box.mouseDragEvent(event)
@@ -91,8 +91,8 @@ class TestForcePlot(WidgetTest):
         x_data = np.arange(5)
         pos_y_data = [(np.arange(5) - 1, np.arange(5))]
         neg_y_data = [(np.arange(5), np.arange(5) + 1)]
-        self.plot.set_data(x_data, pos_y_data, neg_y_data,
-                           self.housing[:5, :2], None)
+        data = self.housing[:5, :2]
+        self.plot.set_data(x_data, pos_y_data, neg_y_data, data)
 
         event = Mock()
         point = self.plot.getViewBox().mapViewToScene(QPointF(1, 2))
@@ -103,8 +103,7 @@ class TestForcePlot(WidgetTest):
             "<br/><br/><b>Features</b>:<br/>CRIM = 0.02731<br/>ZN = 0.0"
         )
 
-        self.plot.set_data(self.housing.X[:5, 0], pos_y_data, neg_y_data,
-                           self.housing[:5, :2], self.housing.domain[0])
+        self.plot.set_data(x_data, pos_y_data, neg_y_data, data)
 
         event = Mock()
         point = self.plot.getViewBox().mapViewToScene(QPointF(1, 2))
@@ -112,7 +111,7 @@ class TestForcePlot(WidgetTest):
         self.plot.help_event(event)
         self.assertEqual(
             show_text.call_args[0][1],
-            "<br/><br/><b>Features</b>:<br/>CRIM = 0.06905<br/>ZN = 0.0"
+            "<br/><br/><b>Features</b>:<br/>CRIM = 0.02731<br/>ZN = 0.0"
         )
 
     def test_instance_tooltip(self):

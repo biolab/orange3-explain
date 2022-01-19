@@ -576,7 +576,6 @@ def prepare_force_plot_data_multi_inst(
         base_value: np.ndarray,
         target_class: int,
         data: Table,
-        order_by: Union[str, Variable],
         order_idxs: np.ndarray
 ) -> Tuple[np.ndarray, List[Tuple[np.ndarray, np.ndarray]],
            List[Tuple[np.ndarray, np.ndarray]], List[str], List[str]]:
@@ -596,9 +595,6 @@ def prepare_force_plot_data_multi_inst(
 
     data : Table
         Transformed data.
-
-    order_by : str or Variable
-        Ordering type or variable.
 
     order_idxs : np.ndarray
         Instance ordering indices.
@@ -624,10 +620,6 @@ def prepare_force_plot_data_multi_inst(
     attributes = data.domain.attributes
     shap_values = shap_values[target_class][order_idxs]
     base_value = base_value[target_class]
-
-    x_data = np.arange(shap_values.shape[0])
-    if isinstance(order_by, Variable):
-        x_data = data.get_column_view(order_by)[0][order_idxs]
 
     exps = [(np.sum(shap_values[k, :]) + base_value, shap_values[k, :])
             for k in range(shap_values.shape[0])]
@@ -656,6 +648,8 @@ def prepare_force_plot_data_multi_inst(
 
         neg_labels.append(attributes[k].name)
 
+    x_data = np.arange(shap_values.shape[0])
+
     return x_data, pos_data, neg_data, pos_labels, neg_labels
 
 
@@ -680,9 +674,7 @@ if __name__ == "__main__":
 
     x_data_, pos_data_, neg_data_, pos_lab_, neg_lab_ = \
         prepare_force_plot_data_multi_inst(
-            shap_values_, base_value_, 0,
-            transformed_, SIMILARITY_ORDER,  # transformed_.domain["RM"]
-            idxs
+            shap_values_, base_value_, 0, transformed_, idxs
         )
 
     print(pos_lab_)
