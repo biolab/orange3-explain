@@ -335,7 +335,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
 
     graph_name = "graph.plotItem"
 
-    ANNOTATIONS = ["Enumeration"]
+    ANNOTATIONS = ["None", "Enumeration"]
 
     def __init__(self):
         OWWidget.__init__(self)
@@ -401,13 +401,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
 
     def __on_annot_changed(self):
         if self.__results:
-            annot_var = self._annot_combo.model()[self.annot_index]
-            if isinstance(annot_var, Variable):
-                data = self.__results.transformed_data[self.__data_idxs]
-                ticks = [[(i, row[annot_var].value) for i, row in enumerate(data)]]
-                self.graph.set_axis(ticks, True)
-            else:
-                self.graph.set_axis(None, False)
+            self._set_plot_annotations()
 
     def _add_buttons(self):
         plot_gui = OWPlotGUI(self)
@@ -515,12 +509,24 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
 
         data = self.__results.transformed_data[self.__data_idxs]
         order_var = self._order_combo.model()[self.order_index]
-        annot_var = self._annot_combo.model()[self.annot_index]
 
         self.graph.set_data(x_data, pos_y_data, neg_y_data, data, order_var)
-        if isinstance(annot_var, Variable):
-            ticks = [[(i, row[annot_var].value) for i, row in enumerate(data)]]
+        self._set_plot_annotations()
+
+    def _set_plot_annotations(self):
+        annotator = self._annot_combo.model()[self.annot_index]
+        if isinstance(annotator, Variable):
+            data = self.__results.transformed_data[self.__data_idxs]
+            ticks = [[(i, row[annotator].value) for i, row in enumerate(data)]]
             self.graph.set_axis(ticks, True)
+        elif annotator == "None":
+            self.graph.set_axis([], False)
+        elif annotator == "Enumeration":
+            ticks = [[(i, str(idx + 1)) for i, idx in
+                      enumerate(self.__data_idxs)]]
+            self.graph.set_axis(ticks, False)
+        else:
+            raise NotImplementedError(annotator)
 
     def on_partial_result(self, _):
         pass

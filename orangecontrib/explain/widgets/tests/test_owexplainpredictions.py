@@ -215,33 +215,33 @@ class TestOWExplainPredictions(WidgetTest):
         self.assertEqual(self.widget._order_combo.count(), 3)
 
     def test_annotation_combo(self):
-        self.assertEqual(self.widget._annot_combo.currentText(), "Enumeration")
-        self.assertEqual(self.widget._annot_combo.count(), 1)
+        self.assertEqual(self.widget._annot_combo.currentText(), "None")
+        self.assertEqual(self.widget._annot_combo.count(), 2)
 
         self.send_signal(self.widget.Inputs.model, self.rf_reg)
-        self.assertEqual(self.widget._annot_combo.currentText(), "Enumeration")
-        self.assertEqual(self.widget._annot_combo.count(), 1)
+        self.assertEqual(self.widget._annot_combo.currentText(), "None")
+        self.assertEqual(self.widget._annot_combo.count(), 2)
 
         self.send_signal(self.widget.Inputs.background_data, self.heart)
         self.send_signal(self.widget.Inputs.data, self.heart[:5])
         self.send_signal(self.widget.Inputs.model, self.rf_cls)
-        self.assertEqual(self.widget._annot_combo.currentText(), "Enumeration")
-        self.assertEqual(self.widget._annot_combo.count(), 3)
+        self.assertEqual(self.widget._annot_combo.currentText(), "None")
+        self.assertEqual(self.widget._annot_combo.count(), 4)
         self.wait_until_finished()
 
         self.widget.graph.set_axis = Mock()
-        simulate.combobox_activate_index(self.widget._annot_combo, 2)
+        simulate.combobox_activate_index(self.widget._annot_combo, 3)
         args = ([[(0, "0"), (1, "1"), (2, "1"), (3, "0"), (4, "0")]], True)
         self.widget.graph.set_axis.assert_called_once_with(*args)
 
         self.widget.graph.set_axis.reset_mock()
-        simulate.combobox_activate_index(self.widget._annot_combo, 0)
-        args = (None, False)
+        simulate.combobox_activate_index(self.widget._annot_combo, 1)
+        args = ([[(0, "1"), (1, "2"), (2, "3"), (3, "4"), (4, "5")]], False)
         self.widget.graph.set_axis.assert_called_once_with(*args)
 
         self.send_signal(self.widget.Inputs.model, None)
-        self.assertEqual(self.widget._annot_combo.currentText(), "Enumeration")
-        self.assertEqual(self.widget._annot_combo.count(), 1)
+        self.assertEqual(self.widget._annot_combo.currentText(), "None")
+        self.assertEqual(self.widget._annot_combo.count(), 2)
 
     def test_setup_plot(self):
         self.widget.graph.set_data = Mock()
@@ -251,8 +251,10 @@ class TestOWExplainPredictions(WidgetTest):
         self.send_signal(self.widget.Inputs.data, self.heart[:5])
         self.send_signal(self.widget.Inputs.model, self.rf_cls)
         self.wait_until_finished()
+        self.widget.graph.set_axis.assert_called_once()
 
-        simulate.combobox_activate_index(self.widget._annot_combo, 2)
+        self.widget.graph.set_axis.reset_mock()
+        simulate.combobox_activate_index(self.widget._annot_combo, 3)
         self.widget.graph.set_data.assert_called_once()
         args = ([[(0, "0"), (1, "1"), (2, "1"), (3, "0"), (4, "0")]], True)
         self.widget.graph.set_axis.assert_called_once_with(*args)
@@ -390,7 +392,7 @@ class TestOWExplainPredictions(WidgetTest):
 
         simulate.combobox_activate_index(self.widget._target_combo, 1)
         simulate.combobox_activate_index(self.widget._order_combo, 4)
-        simulate.combobox_activate_index(self.widget._annot_combo, 2)
+        simulate.combobox_activate_index(self.widget._annot_combo, 3)
 
         self.send_signal(self.widget.Inputs.data, self.housing[:10])
         self.send_signal(self.widget.Inputs.background_data, self.housing)
@@ -406,7 +408,7 @@ class TestOWExplainPredictions(WidgetTest):
 
         self.assertEqual(self.widget.target_index, 1)
         self.assertEqual(self.widget.order_index, 4)
-        self.assertEqual(self.widget.annot_index, 2)
+        self.assertEqual(self.widget.annot_index, 3)
 
     def test_saved_selection(self):
         self.send_signal(self.widget.Inputs.data, self.heart[:10])
