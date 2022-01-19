@@ -282,7 +282,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     name = "Explain Predictions"
     description = "Predictions explanation widget."
     keywords = ["explain", "explain prediction", "explain model"]
-    icon = "icons/ExplainPred.svg"
+    icon = "icons/ExplainPredictions.svg"
     priority = 120
 
     class Inputs:
