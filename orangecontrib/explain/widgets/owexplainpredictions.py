@@ -1,6 +1,7 @@
 from itertools import chain
 from types import SimpleNamespace
 from typing import Optional, List, Tuple
+from xml.sax.saxutils import escape
 
 import numpy as np
 from AnyQt.QtCore import QPointF, Qt, Signal, QRectF
@@ -11,7 +12,7 @@ from pyqtgraph.GraphicsScene.mouseEvents import MouseClickEvent, MouseDragEvent
 
 from Orange.base import Model
 from Orange.data import Table, Domain, ContinuousVariable, Variable
-from Orange.data.table import DomainTransformationError
+from Orange.data.table import DomainTransformationError, RowInstance
 from Orange.widgets import gui
 from Orange.widgets.settings import ContextSetting, Setting, \
     PerfectDomainContextHandler
@@ -270,12 +271,32 @@ class ForcePlot(pg.PlotWidget):
             index = int(round(value, 0))
 
         if 0 <= index < len(self.__tooltip_data):
-            row = self.__tooltip_data[index]
-            text = "".join([f"{a.name} = {row[a]} <br/>" for a in
-                            self.__tooltip_data.domain.attributes])
+            text = self._instance_tooltip(self.__tooltip_data.domain,
+                                          self.__tooltip_data[index])
             QToolTip.showText(event.screenPos(), text, widget=self)
             return True
         return False
+
+    @staticmethod
+    def _instance_tooltip(domain: Domain, instance: RowInstance) -> str:
+        def show_part(singular, plural, max_shown, variables):
+            cols = [escape(f"{var.name} = {instance[var]}")
+                    for var in variables[:max_shown + 2]][:max_shown]
+            if not cols:
+                return ""
+
+            n_vars = len(variables)
+            if n_vars > max_shown:
+                cols[-1] = f"... and {n_vars - max_shown + 1} others"
+
+            tag = singular if n_vars < 2 else plural
+            return f"<b>{tag}</b>:<br/>" + "<br/>".join(cols)
+
+        parts = (("Class", "Classes", 4, domain.class_vars),
+                 ("Meta", "Metas", 4, domain.metas),
+                 ("Feature", "Features", 10, domain.attributes))
+
+        return "<br/>".join(show_part(*columns) for columns in parts)
 
 
 class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):

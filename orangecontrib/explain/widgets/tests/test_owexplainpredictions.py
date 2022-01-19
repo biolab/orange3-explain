@@ -98,8 +98,10 @@ class TestForcePlot(WidgetTest):
         point = self.plot.getViewBox().mapViewToScene(QPointF(1, 2))
         event.scenePos.return_value = point
         self.plot.help_event(event)
-        self.assertEqual(show_text.call_args[0][1],
-                         "CRIM = 0.02731 <br/>ZN = 0.0 <br/>")
+        self.assertEqual(
+            show_text.call_args[0][1],
+            "<br/><br/><b>Features</b>:<br/>CRIM = 0.02731<br/>ZN = 0.0"
+        )
 
         self.plot.set_data(self.housing.X[:5, 0], pos_y_data, neg_y_data,
                            self.housing[:5, :2], self.housing.domain[0])
@@ -108,8 +110,19 @@ class TestForcePlot(WidgetTest):
         point = self.plot.getViewBox().mapViewToScene(QPointF(1, 2))
         event.scenePos.return_value = point
         self.plot.help_event(event)
-        self.assertEqual(show_text.call_args[0][1],
-                         "CRIM = 0.06905 <br/>ZN = 0.0 <br/>")
+        self.assertEqual(
+            show_text.call_args[0][1],
+            "<br/><br/><b>Features</b>:<br/>CRIM = 0.06905<br/>ZN = 0.0"
+        )
+
+    def test_instance_tooltip(self):
+        domain = self.housing.domain
+        instance = self.housing[0]
+        text = "<b>Class</b>:<br/>MEDV = 24.0<br/><br/><b>Features</b>:<br/>" \
+               "CRIM = 0.00632<br/>ZN = 18.0<br/>INDUS = 2.31<br/>CHAS = 0" \
+               "<br/>NOX = 0.5380<br/>RM = 6.575<br/>AGE = 65.2<br/>" \
+               "DIS = 4.0900<br/>RAD = 1<br/>... and 4 others"
+        self.assertEqual(self.plot._instance_tooltip(domain, instance), text)
 
 
 class TestOWExplainPredictions(WidgetTest):
