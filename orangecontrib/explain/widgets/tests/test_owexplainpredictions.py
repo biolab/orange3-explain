@@ -324,6 +324,7 @@ class TestOWExplainPredictions(WidgetTest):
         self.assertIsInstance(output, Table)
         self.assertEqual(len(output), 10)
         self.assertEqual(output.X.shape[1], len(self.rf_cls.domain.attributes))
+        self.assertEqual(len(output.Y), 10)
 
         self.send_signal(self.widget.Inputs.model, None)
         self.assertIsNone(self.get_output(self.widget.Outputs.scores))

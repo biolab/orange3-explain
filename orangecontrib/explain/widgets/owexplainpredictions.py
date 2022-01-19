@@ -559,10 +559,12 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     def output_scores(self):
         scores = None
         if self.__results is not None:
-            domain = self.__results.transformed_data.domain
-            scores = self.__results.values[self.target_index]
+            data = self.__results.transformed_data
+            domain = data.domain
             attrs = [ContinuousVariable(a.name) for a in domain.attributes]
-            scores = Table(Domain(attrs), scores)
+            domain = Domain(attrs, domain.class_vars, domain.metas)
+            scores = self.__results.values[self.target_index]
+            scores = Table(domain, scores, data.Y, data.metas)
         self.Outputs.scores.send(scores)
 
     def send_report(self):
