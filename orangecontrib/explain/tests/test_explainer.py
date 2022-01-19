@@ -345,12 +345,12 @@ class TestExplainer(unittest.TestCase):
         predictions = np.array([[1, 0, 0], [1, 0, 0], [1, 0, 0]])
 
         idxs = get_instance_ordering(
-            shap_values, predictions, 0, self.iris[:3], INSTANCE_ORDERINGS[0])
+            shap_values, predictions, 0, self.iris[:3], INSTANCE_ORDERINGS[2])
 
         x_data, pos_data, neg_data, pos_labels, neg_labels = \
             prepare_force_plot_data_multi_inst(
                 shap_values, base_value, 0,
-                self.iris[:3], INSTANCE_ORDERINGS[0], idxs
+                self.iris[:3], INSTANCE_ORDERINGS[2], idxs
             )
 
         np.testing.assert_array_equal(x_data, np.arange(3))

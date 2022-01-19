@@ -194,12 +194,12 @@ class TestOWExplainPredictions(WidgetTest):
 
     def test_order_combo(self):
         self.assertEqual(self.widget._order_combo.currentText(),
-                         "Original instance ordering")
+                         "Order instances by similarity")
         self.assertEqual(self.widget._order_combo.count(), 3)
 
         self.send_signal(self.widget.Inputs.model, self.rf_cls)
         self.assertEqual(self.widget._order_combo.currentText(),
-                         "Original instance ordering")
+                         "Order instances by similarity")
         # 1 separator
         self.assertEqual(self.widget._order_combo.count(),
                          len(self.rf_cls.domain.attributes) + 1 +
@@ -211,7 +211,7 @@ class TestOWExplainPredictions(WidgetTest):
 
         self.send_signal(self.widget.Inputs.model, None)
         self.assertEqual(self.widget._order_combo.currentText(),
-                         "Original instance ordering")
+                         "Order instances by similarity")
         self.assertEqual(self.widget._order_combo.count(), 3)
 
     def test_annotation_combo(self):
@@ -231,12 +231,12 @@ class TestOWExplainPredictions(WidgetTest):
 
         self.widget.graph.set_axis = Mock()
         simulate.combobox_activate_index(self.widget._annot_combo, 3)
-        args = ([[(0, "0"), (1, "1"), (2, "1"), (3, "0"), (4, "0")]], True)
+        args = ([[(0, "1"), (1, "1"), (2, "0"), (3, "0"), (4, "0")]], True)
         self.widget.graph.set_axis.assert_called_once_with(*args)
 
         self.widget.graph.set_axis.reset_mock()
         simulate.combobox_activate_index(self.widget._annot_combo, 1)
-        args = ([[(0, "1"), (1, "2"), (2, "3"), (3, "4"), (4, "5")]], False)
+        args = ([[(0, "2"), (1, "3"), (2, "1"), (3, "5"), (4, "4")]], False)
         self.widget.graph.set_axis.assert_called_once_with(*args)
 
         self.send_signal(self.widget.Inputs.model, None)
@@ -256,7 +256,7 @@ class TestOWExplainPredictions(WidgetTest):
         self.widget.graph.set_axis.reset_mock()
         simulate.combobox_activate_index(self.widget._annot_combo, 3)
         self.widget.graph.set_data.assert_called_once()
-        args = ([[(0, "0"), (1, "1"), (2, "1"), (3, "0"), (4, "0")]], True)
+        args = ([[(0, "1"), (1, "1"), (2, "0"), (3, "0"), (4, "0")]], True)
         self.widget.graph.set_axis.assert_called_once_with(*args)
 
         self.widget.graph.set_data.reset_mock()

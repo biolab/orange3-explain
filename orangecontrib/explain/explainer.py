@@ -16,10 +16,10 @@ from Orange.widgets.utils.colorpalettes import LimitedDiscretePalette
 RGB_LOW = [0, 137, 229]
 RGB_HIGH = [255, 0, 66]
 
+SIMILARITY_ORDER = "Order instances by similarity"
 ORIGINAL_ORDER = "Original instance ordering"
 OUTPUT_ORDER = "Order instances by output value"
-SIMILARITY_ORDER = "Order instances by similarity"
-INSTANCE_ORDERINGS = [ORIGINAL_ORDER, OUTPUT_ORDER, SIMILARITY_ORDER]
+INSTANCE_ORDERINGS = [SIMILARITY_ORDER, OUTPUT_ORDER, ORIGINAL_ORDER]
 
 
 @contextlib.contextmanager
