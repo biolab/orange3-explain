@@ -572,32 +572,20 @@ def get_instance_ordering(
 
 
 def prepare_force_plot_data_multi_inst(
-        shap_values: List[np.ndarray],
-        base_value: np.ndarray,
-        target_class: int,
-        data: Table,
-        order_idxs: np.ndarray
+        shap_values: np.ndarray,
+        base_value: float
 ) -> Tuple[np.ndarray, List[Tuple[np.ndarray, np.ndarray]],
-           List[Tuple[np.ndarray, np.ndarray]], List[str], List[str]]:
+           List[Tuple[np.ndarray, np.ndarray]]]:
     """
     Prepare data for a force plot with multiple instances.
 
     Parameters
     ----------
-    shap_values : list:
-        List of SHAP values.
+    shap_values : np.ndarray
+        An array of SHAP values.
 
     base_value : np.ndarray
-        An array of base values.
-
-    target_class : int
-        Target class to plot.
-
-    data : Table
-        Transformed data.
-
-    order_idxs : np.ndarray
-        Instance ordering indices.
+        Base values.
 
     Returns
     -------
@@ -610,21 +598,9 @@ def prepare_force_plot_data_multi_inst(
     neg_data : list
         List of tuples of arrays for 'red' intervals.
 
-    pos_labels : list
-        List of feature names for 'blue' intervals.
-
-    neg_labels : list
-        List of feature names for 'red' intervals.
-
     """
-    attributes = data.domain.attributes
-    shap_values = shap_values[target_class][order_idxs]
-    base_value = base_value[target_class]
-
     exps = [(np.sum(shap_values[k, :]) + base_value, shap_values[k, :])
             for k in range(shap_values.shape[0])]
-
-    pos_labels, neg_labels = [], []
 
     pos_data = []
     pos_idxs = np.argsort(shap_values.clip(min=0).sum(axis=0))[::-1]
@@ -635,8 +611,6 @@ def prepare_force_plot_data_multi_inst(
                             for s, v in exps])
         pos_data.append((y_upper, y_lower))
 
-        pos_labels.append(attributes[k].name)
-
     neg_data = []
     neg_idxs = np.argsort(shap_values.clip(max=0).sum(axis=0))
     for i, k in enumerate(neg_idxs):
@@ -646,11 +620,7 @@ def prepare_force_plot_data_multi_inst(
                             for s, v in exps])
         neg_data.append((y_lower, y_upper))
 
-        neg_labels.append(attributes[k].name)
-
-    x_data = np.arange(shap_values.shape[0])
-
-    return x_data, pos_data, neg_data, pos_labels, neg_labels
+    return np.arange(shap_values.shape[0]), pos_data, neg_data
 
 
 if __name__ == "__main__":

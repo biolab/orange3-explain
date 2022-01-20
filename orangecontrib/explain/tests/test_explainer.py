@@ -347,10 +347,8 @@ class TestExplainer(unittest.TestCase):
         idxs = get_instance_ordering(
             shap_values, predictions, 0, self.iris[:3], INSTANCE_ORDERINGS[2])
 
-        x_data, pos_data, neg_data, pos_labels, neg_labels = \
-            prepare_force_plot_data_multi_inst(
-                shap_values, base_value, 0, self.iris[:3], idxs
-            )
+        x_data, pos_data, neg_data = prepare_force_plot_data_multi_inst(
+            shap_values[0][idxs], base_value[0])
 
         np.testing.assert_array_equal(x_data, np.arange(3))
         self.assertEqual(len(pos_data), 4)
@@ -376,9 +374,6 @@ class TestExplainer(unittest.TestCase):
             np.testing.assert_array_equal(neg_data[i][0], y1)
             np.testing.assert_array_equal(neg_data[i][1], y2)
 
-        self.assertEqual(len(pos_labels), 4)
-        self.assertEqual(len(neg_labels), 4)
-
     def test_prepare_force_plot_data_multi_inst_order(self):
         base_value = np.array([3])
         shap_values = [
@@ -389,10 +384,8 @@ class TestExplainer(unittest.TestCase):
         idxs = get_instance_ordering(
             shap_values, predictions, 0, self.iris[:3], self.iris.domain[0])
 
-        x_data, pos_data, neg_data, pos_labels, neg_labels = \
-            prepare_force_plot_data_multi_inst(
-                shap_values, base_value, 0, self.iris[:3], idxs
-            )
+        x_data, pos_data, neg_data = prepare_force_plot_data_multi_inst(
+            shap_values[0][idxs], base_value[0])
 
         np.testing.assert_array_equal(x_data, np.arange(3))
         self.assertEqual(len(pos_data), 4)
@@ -417,9 +410,6 @@ class TestExplainer(unittest.TestCase):
                                       ([15, 2, 15], [15, 3, 15])]):
             np.testing.assert_array_equal(neg_data[i][0], y1)
             np.testing.assert_array_equal(neg_data[i][1], y2)
-
-        self.assertEqual(len(pos_labels), 4)
-        self.assertEqual(len(neg_labels), 4)
 
     def test_prepare_force_plot_data_target_0(self):
         shap_values = [

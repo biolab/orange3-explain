@@ -486,13 +486,10 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
             self._order_combo.model()[self.order_index]
         )
 
-        x_data, pos_y_data, neg_y_data, _, _ = \
+        x_data, pos_y_data, neg_y_data = \
             prepare_force_plot_data_multi_inst(
-                self.__results.values,
-                self.__results.base_value,
-                self.target_index,
-                self.__results.transformed_data,
-                self.__data_idxs
+                self.__results.values[self.target_index][self.__data_idxs],
+                self.__results.base_value[self.target_index]
             )
 
         self.graph.set_data(x_data, pos_y_data, neg_y_data,
