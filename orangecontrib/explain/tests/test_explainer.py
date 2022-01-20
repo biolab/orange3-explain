@@ -311,7 +311,7 @@ class TestExplainer(unittest.TestCase):
     def test_explain_predictions(self):
         model = LogisticRegressionLearner()(self.iris)
 
-        shap_values, predictions, _, _ = explain_predictions(
+        shap_values, predictions, _, _, _ = explain_predictions(
             model, self.iris[:3], self.iris
         )
 
@@ -326,7 +326,7 @@ class TestExplainer(unittest.TestCase):
 
         # regression
         model = LinearRegressionLearner()(self.housing)
-        shap_values, predictions, _, _ = explain_predictions(
+        shap_values, predictions, _, _, _ = explain_predictions(
             model, self.housing[:3], self.housing
         )
 

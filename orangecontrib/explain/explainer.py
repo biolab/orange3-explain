@@ -381,7 +381,7 @@ def explain_predictions(
     data: Table,
     background_data: Table,
     progress_callback: Callable = None,
-) -> Tuple[List[np.ndarray], np.ndarray, Table, np.ndarray]:
+) -> Tuple[List[np.ndarray], np.ndarray, Table, np.ndarray, np.ndarray]:
     """
     Compute SHAP values and predictions for each item in data.
     This function provides all required components for explaining the
@@ -415,6 +415,9 @@ def explain_predictions(
     transformed_data
         Table on which explanation was made: table preprocessed by models
         preprocessors
+    sample_mask
+        SHAP values are computed just for a data sample. It is a boolean mask
+        that tells which rows in data_transformed are explained.
     base_value
         The base value (average prediction on dataset) for each class.
     """
@@ -435,10 +438,9 @@ def explain_predictions(
     if predictions.ndim == 1:
         predictions = predictions[:, None]
 
-    shap_values, transformed_data, _, base_value = compute_shap_values(
-        model, data, background_data, progress_callback
-    )
-    return shap_values, predictions, transformed_data, base_value
+    shap_values, transformed_data, sample_mask, base_value = \
+        compute_shap_values(model, data, background_data, progress_callback)
+    return shap_values, predictions, transformed_data, sample_mask, base_value
 
 
 def _compute_segments(
@@ -664,16 +666,13 @@ if __name__ == "__main__":
     shap_values_, transformed_, _, base_value_ = \
         compute_shap_values(model_, table[:50], table)
 
-    idxs = get_instance_ordering(shap_values_, None, 0,
+    idxs = get_instance_ordering(shap_values_[0], None,
                                  transformed_, SIMILARITY_ORDER)
 
-    x_data_, pos_data_, neg_data_, pos_lab_, neg_lab_ = \
+    x_data_, pos_data_, neg_data_ = \
         prepare_force_plot_data_multi_inst(
-            shap_values_, base_value_, 0, transformed_, idxs
+            shap_values_[0][idxs], base_value_[0]
         )
-
-    print(pos_lab_)
-    print(neg_lab_)
 
     for y1, y2 in pos_data_:
         color = tuple(np.array(RGB_HIGH) / 255)

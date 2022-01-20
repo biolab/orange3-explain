@@ -147,6 +147,17 @@ class TestOWExplainPredictions(WidgetTest):
         self.send_signal(self.widget.Inputs.data, None)
         self.assertFalse(self.widget.Error.not_enough_data.is_shown())
 
+    def test_input_too_many_instances(self):
+        titanic = Table("titanic")
+        model = RandomForestLearner(random_state=0)(titanic)
+        self.send_signal(self.widget.Inputs.background_data, titanic)
+        self.send_signal(self.widget.Inputs.data, titanic)
+        self.send_signal(self.widget.Inputs.model, model)
+        self.wait_until_finished()
+
+        output = self.get_output(self.widget.Outputs.scores)
+        self.assertEqual(len(output), 1000)
+
     def test_classification_data_classification_model(self):
         self.send_signal(self.widget.Inputs.background_data, self.heart)
         self.send_signal(self.widget.Inputs.data, self.heart[:10])

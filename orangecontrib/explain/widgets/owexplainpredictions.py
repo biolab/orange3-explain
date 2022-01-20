@@ -6,7 +6,7 @@ from xml.sax.saxutils import escape
 import numpy as np
 from AnyQt.QtCore import QPointF, Qt, Signal, QRectF
 from AnyQt.QtGui import QTransform, QPainter
-from AnyQt.QtWidgets import QToolTip, QGraphicsSceneHelpEvent
+from AnyQt.QtWidgets import QToolTip, QGraphicsSceneHelpEvent, QComboBox
 import pyqtgraph as pg
 from pyqtgraph.GraphicsScene.mouseEvents import MouseClickEvent, MouseDragEvent
 
@@ -35,11 +35,12 @@ class RunnerResults(SimpleNamespace):
     values: Optional[List[np.ndarray]] = None
     predictions: Optional[np.ndarray] = None
     transformed_data: Optional[Table] = None
+    mask: Optional[np.ndarray] = None
     base_value: Optional[float] = None
 
 
 def run(data: Table, background_data: Table, model: Model, state: TaskState) \
-        -> RunnerResults:
+        -> Optional[RunnerResults]:
     if not data or not background_data or not model:
         return None
 
@@ -50,10 +51,13 @@ def run(data: Table, background_data: Table, model: Model, state: TaskState) \
         if state.is_interruption_requested():
             raise Exception
 
-    values, pred, data, base_value = explain_predictions(
+    values, pred, data, sample_mask, base_value = explain_predictions(
         model, data, background_data, callback)
-    return RunnerResults(values=values, predictions=pred,
-                         transformed_data=data, base_value=base_value)
+    return RunnerResults(values=values,
+                         predictions=pred,
+                         transformed_data=data,
+                         mask=sample_mask,
+                         base_value=base_value)
 
 
 class SelectionRect(pg.GraphicsObject):
@@ -224,6 +228,9 @@ class ForcePlot(pg.PlotWidget):
             self.selectionChanged.emit([])
 
     def apply_selection(self, selection: List[Tuple[float, float]]):
+        if self.__data_bounds is None:
+            return
+
         (x_min, x_max), (y_min, y_max) = self.__data_bounds
         for x_start, x_stop in selection:
             p1 = QPointF(x_start, y_min)
@@ -331,6 +338,11 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         # cached instance indices after instance ordering
         self.__data_idxs: Optional[np.ndarray] = None
         self.__pending_selection: List[int] = self.selection_ranges
+
+        self.graph: ForcePlot = None
+        self._target_combo: QComboBox = None
+        self._order_combo: ForcePlot = None
+        self._annot_combo: ForcePlot = None
 
         self.setup_gui()
 
@@ -516,7 +528,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     def on_partial_result(self, _):
         pass
 
-    def on_done(self, results):
+    def on_done(self, results: Optional[RunnerResults]):
         self.__results = results
         self.setup_plot()
         self.apply_selection()
@@ -560,7 +572,8 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     def output_scores(self):
         scores = None
         if self.__results is not None:
-            data = self.__results.transformed_data
+            mask = self.__results.mask
+            data = self.__results.transformed_data[mask]
             domain = data.domain
             attrs = [ContinuousVariable(a.name) for a in domain.attributes]
             domain = Domain(attrs, domain.class_vars, domain.metas)
