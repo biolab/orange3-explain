@@ -551,20 +551,45 @@ def prepare_force_plot_data(
 
 
 def get_instance_ordering(
-        shap_values: List[np.ndarray],
+        shap_values: np.ndarray,
         predictions: np.ndarray,
-        target_class: int,
         data: Table,
         order_by: Union[str, Variable]
 ) -> np.ndarray:
-    shap_values = shap_values[target_class]
+    """
+    Get indices to order dataset.
+
+    Parameters
+    ----------
+    shap_values : np.ndarray
+        An array of SHAP values.
+
+    predictions : np.ndarray
+        An array predictions.
+
+    data : Table
+        Predicted dataset.
+
+    order_by : str or Variable
+        Variable of str to order instances by.
+
+    Returns
+    -------
+    array : np.ndarray
+        An array of integers.
+
+    Raises
+    ------
+    NotImplementedError if unknown order_by.
+    """
     if isinstance(order_by, Variable):
         x_data = data.get_column_view(order_by)[0]
-        return np.argsort(x_data)
+        clust_ord = np.argsort(hclust_ordering(shap_values))
+        return np.lexsort([clust_ord, x_data])
     elif order_by == ORIGINAL_ORDER:
         return np.arange(shap_values.shape[0])
     elif order_by == OUTPUT_ORDER:
-        return np.argsort(predictions[:, target_class])[::-1]
+        return np.argsort(predictions)[::-1]
     elif order_by == SIMILARITY_ORDER:
         return hclust_ordering(shap_values)
     else:

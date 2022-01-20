@@ -379,13 +379,14 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         self.commit()
 
     def __on_order_changed(self):
-        self.selection_ranges_ranges = []
+        self.selection_ranges = []
         self.setup_plot()
         self.commit()
 
     def __on_annot_changed(self):
-        if self.__results:
-            self._set_plot_annotations()
+        if not self.__results or not self.data:
+            return
+        self._set_plot_annotations()
 
     def _add_buttons(self):
         plot_gui = OWPlotGUI(self)
@@ -395,11 +396,11 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     @Inputs.data
     @check_sql_input
     def set_data(self, data: Optional[Table]):
-        self.Error.not_enough_data.clear()
+        self.closeContext()
         self.data = data
-        if self.data and len(self.data) < 2:
-            self.data = None
-            self.Error.not_enough_data()
+        self._check_data()
+        self._setup_controls()
+        self.openContext(self.data.domain if self.data else None)
 
     @Inputs.background_data
     @check_sql_input
@@ -408,12 +409,15 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
 
     @Inputs.model
     def set_model(self, model: Optional[Model]):
-        self.closeContext()
         self.model = model
-        self.setup_controls()
-        self.openContext(self.model.domain if self.model else None)
 
-    def setup_controls(self):
+    def _check_data(self):
+        self.Error.not_enough_data.clear()
+        if self.data and len(self.data) < 2:
+            self.data = None
+            self.Error.not_enough_data()
+
+    def _setup_controls(self):
         self._target_combo.clear()
         self._target_combo.setEnabled(True)
 
@@ -424,35 +428,33 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         orderings = INSTANCE_ORDERINGS
         annotations = self.ANNOTATIONS
 
-        model = self.model
-        if model is not None:
-            if model.domain.has_discrete_class:
-                self._target_combo.addItems(model.domain.class_var.values)
+        if self.data:
+            domain = self.data.domain
+            if domain.has_discrete_class:
+                self._target_combo.addItems(domain.class_var.values)
                 self.target_index = 0
-            elif model.domain.has_continuous_class:
+            elif domain.has_continuous_class:
                 self.target_index = -1
                 self._target_combo.setEnabled(False)
-            else:
-                raise NotImplementedError
 
-            c_attrs = [a for a in model.domain.attributes if a.is_continuous]
             orderings = chain(
                 INSTANCE_ORDERINGS,
-                [VariableListModel.Separator] if c_attrs else [],
-                c_attrs,
+                [VariableListModel.Separator] if domain.metas else [],
+                domain.metas,
+                [VariableListModel.Separator] if domain.class_vars else [],
+                domain.class_vars,
+                [VariableListModel.Separator] if domain.attributes else [],
+                domain.attributes,
             )
 
-            attrs = [a for a in model.domain.attributes if not a.is_continuous]
-            cvars = [c for c in model.domain.class_vars if not c.is_continuous]
-            metas = [m for m in model.domain.metas if not m.is_continuous]
             annotations = chain(
                 self.ANNOTATIONS,
-                [VariableListModel.Separator] if metas else [],
-                metas,
-                [VariableListModel.Separator] if cvars else [],
-                cvars,
-                [VariableListModel.Separator] if attrs else [],
-                attrs,
+                [VariableListModel.Separator] if domain.metas else [],
+                domain.metas,
+                [VariableListModel.Separator] if domain.class_vars else [],
+                domain.class_vars,
+                [VariableListModel.Separator] if domain.attributes else [],
+                domain.attributes,
             )
 
         self._order_combo.model()[:] = orderings
@@ -470,6 +472,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         self.Error.unknown_err.clear()
         self.selection_ranges = []
         self.graph.clear_all()
+        self.graph.set_axis(None, False)
         self.__data_idxs = None
 
     def setup_plot(self):
@@ -479,10 +482,9 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
             return
 
         self.__data_idxs = get_instance_ordering(
-            self.__results.values,
-            self.__results.predictions,
-            self.target_index,
-            self.__results.transformed_data,
+            self.__results.values[self.target_index],
+            self.__results.predictions[:, self.target_index],
+            self.data,
             self._order_combo.model()[self.order_index]
         )
 
@@ -499,8 +501,8 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     def _set_plot_annotations(self):
         annotator = self._annot_combo.model()[self.annot_index]
         if isinstance(annotator, Variable):
-            data = self.__results.transformed_data[self.__data_idxs]
-            ticks = [[(i, row[annotator].value) for i, row in enumerate(data)]]
+            ticks = [[(i, str(row[annotator].value)) for i, row in
+                      enumerate(self.data[self.__data_idxs])]]
             self.graph.set_axis(ticks, True)
         elif annotator == "None":
             self.graph.set_axis([], False)
@@ -542,23 +544,12 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         selected_indices = []
 
         if self.__results:
-            ordering = self._order_combo.model()[self.order_index]
-
-            if ordering in INSTANCE_ORDERINGS:
-                selection = list(set(
-                    chain.from_iterable(
-                        range(int(np.ceil(start)), int(np.floor(stop) + 1))
-                        for start, stop in self.selection_ranges)
-                ))
-                selected_indices = sorted(self.__data_idxs[selection])
-
-            else:  # variable
-                data = self.__results.transformed_data
-                column = data.get_column_view(ordering)[0]
-                mask = np.zeros((len(column)), dtype=bool)
-                for start, stop in self.selection_ranges:
-                    mask |= (start <= column) & (column <= stop)
-                selected_indices = list(np.flatnonzero(mask))
+            selection = list(set(
+                chain.from_iterable(
+                    range(int(np.ceil(start)), int(np.floor(stop) + 1))
+                    for start, stop in self.selection_ranges)
+            ))
+            selected_indices = sorted(self.__data_idxs[selection])
 
         if self.data and selected_indices:
             selected = self.data[selected_indices]

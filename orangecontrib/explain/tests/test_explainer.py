@@ -345,7 +345,8 @@ class TestExplainer(unittest.TestCase):
         predictions = np.array([[1, 0, 0], [1, 0, 0], [1, 0, 0]])
 
         idxs = get_instance_ordering(
-            shap_values, predictions, 0, self.iris[:3], INSTANCE_ORDERINGS[2])
+            shap_values[0], predictions[:, 0],
+            self.iris[:3], INSTANCE_ORDERINGS[2])
 
         x_data, pos_data, neg_data = prepare_force_plot_data_multi_inst(
             shap_values[0][idxs], base_value[0])
@@ -382,7 +383,8 @@ class TestExplainer(unittest.TestCase):
         predictions = np.array([[1, 0, 0], [1, 0, 0], [1, 0, 0]])
 
         idxs = get_instance_ordering(
-            shap_values, predictions, 0, self.iris[:3], self.iris.domain[0])
+            shap_values[0], predictions[:, 0],
+            self.iris[:3], self.iris.domain[0])
 
         x_data, pos_data, neg_data = prepare_force_plot_data_multi_inst(
             shap_values[0][idxs], base_value[0])

@@ -181,23 +181,23 @@ class TestOWExplainPredictions(WidgetTest):
         self.assertEqual(self.widget._target_combo.currentText(), "")
         self.assertTrue(self.widget._target_combo.isEnabled())
 
-        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+        self.send_signal(self.widget.Inputs.data, self.heart[:5])
         self.assertEqual(self.widget._target_combo.currentText(), "0")
         self.assertTrue(self.widget._target_combo.isEnabled())
 
-        self.send_signal(self.widget.Inputs.model, self.rf_reg)
+        self.send_signal(self.widget.Inputs.data, self.housing[:5])
         self.assertEqual(self.widget._target_combo.currentText(), "")
         self.assertFalse(self.widget._target_combo.isEnabled())
 
-        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+        self.send_signal(self.widget.Inputs.data, self.heart[:5])
         self.assertEqual(self.widget._target_combo.currentText(), "0")
         self.assertTrue(self.widget._target_combo.isEnabled())
 
-        self.send_signal(self.widget.Inputs.model, self.rf_reg)
+        self.send_signal(self.widget.Inputs.data, self.housing[:5])
         self.assertEqual(self.widget._target_combo.currentText(), "")
         self.assertFalse(self.widget._target_combo.isEnabled())
 
-        self.send_signal(self.widget.Inputs.model, None)
+        self.send_signal(self.widget.Inputs.data, None)
         self.assertEqual(self.widget._target_combo.currentText(), "")
         self.assertTrue(self.widget._target_combo.isEnabled())
 
@@ -209,16 +209,15 @@ class TestOWExplainPredictions(WidgetTest):
         self.send_signal(self.widget.Inputs.model, self.rf_cls)
         self.assertEqual(self.widget._order_combo.currentText(),
                          "Order instances by similarity")
-        # 1 separator
-        self.assertEqual(self.widget._order_combo.count(),
-                         len(self.rf_cls.domain.attributes) + 1 +
-                         len(INSTANCE_ORDERINGS))
         self.send_signal(self.widget.Inputs.background_data, self.heart)
         self.send_signal(self.widget.Inputs.data, self.heart[:10])
+        # 2 separators
+        self.assertEqual(self.widget._order_combo.count(),
+                         len(self.heart.domain) + 2 + len(INSTANCE_ORDERINGS))
         self.wait_until_finished()
         simulate.combobox_run_through_all(self.widget._order_combo)
 
-        self.send_signal(self.widget.Inputs.model, None)
+        self.send_signal(self.widget.Inputs.data, None)
         self.assertEqual(self.widget._order_combo.currentText(),
                          "Order instances by similarity")
         self.assertEqual(self.widget._order_combo.count(), 3)
@@ -235,7 +234,7 @@ class TestOWExplainPredictions(WidgetTest):
         self.send_signal(self.widget.Inputs.data, self.heart[:5])
         self.send_signal(self.widget.Inputs.model, self.rf_cls)
         self.assertEqual(self.widget._annot_combo.currentText(), "None")
-        self.assertEqual(self.widget._annot_combo.count(), 4)
+        self.assertEqual(self.widget._annot_combo.count(), 18)
         self.wait_until_finished()
 
         self.widget.graph.set_axis = Mock()
@@ -248,7 +247,7 @@ class TestOWExplainPredictions(WidgetTest):
         args = ([[(0, "2"), (1, "3"), (2, "1"), (3, "5"), (4, "4")]], False)
         self.widget.graph.set_axis.assert_called_once_with(*args)
 
-        self.send_signal(self.widget.Inputs.model, None)
+        self.send_signal(self.widget.Inputs.data, None)
         self.assertEqual(self.widget._annot_combo.currentText(), "None")
         self.assertEqual(self.widget._annot_combo.count(), 2)
 
@@ -260,7 +259,7 @@ class TestOWExplainPredictions(WidgetTest):
         self.send_signal(self.widget.Inputs.data, self.heart[:5])
         self.send_signal(self.widget.Inputs.model, self.rf_cls)
         self.wait_until_finished()
-        self.widget.graph.set_axis.assert_called_once()
+        self.widget.graph.set_axis.assert_called()
 
         self.widget.graph.set_axis.reset_mock()
         simulate.combobox_activate_index(self.widget._annot_combo, 3)
@@ -411,13 +410,18 @@ class TestOWExplainPredictions(WidgetTest):
         self.assertEqual(self.widget.order_index, 0)
         self.assertEqual(self.widget.annot_index, 0)
 
-        self.send_signal(self.widget.Inputs.data, self.heart[:10])
-        self.send_signal(self.widget.Inputs.background_data, self.heart)
-        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+        simulate.combobox_activate_index(self.widget._order_combo, 6)
+        simulate.combobox_activate_index(self.widget._annot_combo, 7)
 
+        self.send_signal(self.widget.Inputs.data, self.heart[:10])
         self.assertEqual(self.widget.target_index, 1)
         self.assertEqual(self.widget.order_index, 4)
         self.assertEqual(self.widget.annot_index, 3)
+
+        self.send_signal(self.widget.Inputs.data, self.housing[:10])
+        self.assertEqual(self.widget.target_index, -1)
+        self.assertEqual(self.widget.order_index, 6)
+        self.assertEqual(self.widget.annot_index, 7)
 
     def test_saved_selection(self):
         self.send_signal(self.widget.Inputs.data, self.heart[:10])
