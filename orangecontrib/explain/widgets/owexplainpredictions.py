@@ -306,10 +306,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     class Error(OWWidget.Error):
         domain_transform_err = Msg("{}")
         unknown_err = Msg("{}")
-
-    class Information(OWWidget.Information):
-        multiple_instances = Msg("Explaining prediction for the first "
-                                 "instance in 'Data'.")
+        not_enough_data = Msg("At least two instances are needed.")
 
     buttons_area_orientation = Qt.Vertical
 
@@ -398,7 +395,11 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     @Inputs.data
     @check_sql_input
     def set_data(self, data: Optional[Table]):
+        self.Error.not_enough_data.clear()
         self.data = data
+        if self.data and len(self.data) < 2:
+            self.data = None
+            self.Error.not_enough_data()
 
     @Inputs.background_data
     @check_sql_input
@@ -465,7 +466,8 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     def clear(self):
         self.__results = None
         self.cancel()
-        self.clear_messages()
+        self.Error.domain_transform_err.clear()
+        self.Error.unknown_err.clear()
         self.selection_ranges = []
         self.graph.clear_all()
         self.__data_idxs = None

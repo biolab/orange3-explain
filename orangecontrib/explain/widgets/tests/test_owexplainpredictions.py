@@ -137,6 +137,16 @@ class TestOWExplainPredictions(WidgetTest):
     def setUp(self):
         self.widget = self.create_widget(OWExplainPredictions)
 
+    def test_input_one_instance(self):
+        self.send_signal(self.widget.Inputs.background_data, self.heart)
+        self.send_signal(self.widget.Inputs.data, self.heart[:1])
+        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+        self.wait_until_finished()
+
+        self.assertTrue(self.widget.Error.not_enough_data.is_shown())
+        self.send_signal(self.widget.Inputs.data, None)
+        self.assertFalse(self.widget.Error.not_enough_data.is_shown())
+
     def test_classification_data_classification_model(self):
         self.send_signal(self.widget.Inputs.background_data, self.heart)
         self.send_signal(self.widget.Inputs.data, self.heart[:10])
@@ -154,14 +164,14 @@ class TestOWExplainPredictions(WidgetTest):
 
     def test_regression_data_regression_model(self):
         self.send_signal(self.widget.Inputs.background_data, self.housing)
-        self.send_signal(self.widget.Inputs.data, self.housing[:1])
+        self.send_signal(self.widget.Inputs.data, self.housing[:10])
         self.send_signal(self.widget.Inputs.model, self.rf_reg)
         self.wait_until_finished()
         self.assertPlotNotEmpty(self.widget.graph)
 
     def test_regression_data_classification_model(self):
         self.send_signal(self.widget.Inputs.background_data, self.housing)
-        self.send_signal(self.widget.Inputs.data, self.housing[:1])
+        self.send_signal(self.widget.Inputs.data, self.housing[:10])
         self.send_signal(self.widget.Inputs.model, self.rf_cls)
         self.wait_until_finished()
         self.assertPlotEmpty(self.widget.graph)
