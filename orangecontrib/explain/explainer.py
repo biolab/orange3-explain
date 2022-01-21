@@ -2,18 +2,24 @@ import contextlib
 from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
-from Orange.widgets.utils.colorpalettes import LimitedDiscretePalette
 from scipy import sparse
 
-from Orange.base import Model
-from Orange.data import Table, Domain
-from Orange.util import dummy_callback, wrap_callback
 from shap import KernelExplainer, TreeExplainer
-from shap.utils import sample
+from shap.utils import sample, hclust_ordering
 from shap.utils._legacy import kmeans
+
+from Orange.base import Model
+from Orange.data import Table, Domain, Variable
+from Orange.util import dummy_callback, wrap_callback
+from Orange.widgets.utils.colorpalettes import LimitedDiscretePalette
 
 RGB_LOW = [0, 137, 229]
 RGB_HIGH = [255, 0, 66]
+
+SIMILARITY_ORDER = "Order instances by similarity"
+ORIGINAL_ORDER = "Original instance ordering"
+OUTPUT_ORDER = "Order instances by output value"
+INSTANCE_ORDERINGS = [SIMILARITY_ORDER, OUTPUT_ORDER, ORIGINAL_ORDER]
 
 
 @contextlib.contextmanager
@@ -375,7 +381,7 @@ def explain_predictions(
     data: Table,
     background_data: Table,
     progress_callback: Callable = None,
-) -> Tuple[List[np.ndarray], np.ndarray, Table, np.ndarray]:
+) -> Tuple[List[np.ndarray], np.ndarray, Table, np.ndarray, np.ndarray]:
     """
     Compute SHAP values and predictions for each item in data.
     This function provides all required components for explaining the
@@ -409,6 +415,9 @@ def explain_predictions(
     transformed_data
         Table on which explanation was made: table preprocessed by models
         preprocessors
+    sample_mask
+        SHAP values are computed just for a data sample. It is a boolean mask
+        that tells which rows in data_transformed are explained.
     base_value
         The base value (average prediction on dataset) for each class.
     """
@@ -429,10 +438,9 @@ def explain_predictions(
     if predictions.ndim == 1:
         predictions = predictions[:, None]
 
-    shap_values, transformed_data, _, base_value = compute_shap_values(
-        model, data, background_data, progress_callback
-    )
-    return shap_values, predictions, transformed_data, base_value
+    shap_values, transformed_data, sample_mask, base_value = \
+        compute_shap_values(model, data, background_data, progress_callback)
+    return shap_values, predictions, transformed_data, sample_mask, base_value
 
 
 def _compute_segments(
@@ -544,13 +552,141 @@ def prepare_force_plot_data(
     return selected_shap_values, segments, selected_labels, ranges
 
 
+def get_instance_ordering(
+        shap_values: np.ndarray,
+        predictions: np.ndarray,
+        data: Table,
+        order_by: Union[str, Variable]
+) -> np.ndarray:
+    """
+    Get indices to order dataset.
+
+    Parameters
+    ----------
+    shap_values : np.ndarray
+        An array of SHAP values.
+
+    predictions : np.ndarray
+        An array predictions.
+
+    data : Table
+        Predicted dataset.
+
+    order_by : str or Variable
+        Variable of str to order instances by.
+
+    Returns
+    -------
+    array : np.ndarray
+        An array of integers.
+
+    Raises
+    ------
+    NotImplementedError if unknown order_by.
+    """
+    if isinstance(order_by, Variable):
+        x_data = data.get_column_view(order_by)[0]
+        clust_ord = np.argsort(hclust_ordering(shap_values))
+        return np.lexsort([clust_ord, x_data])
+    elif order_by == ORIGINAL_ORDER:
+        return np.arange(shap_values.shape[0])
+    elif order_by == OUTPUT_ORDER:
+        return np.argsort(predictions)[::-1]
+    elif order_by == SIMILARITY_ORDER:
+        return hclust_ordering(shap_values)
+    else:
+        raise NotImplementedError(order_by)
+
+
+def prepare_force_plot_data_multi_inst(
+        shap_values: np.ndarray,
+        base_value: float
+) -> Tuple[np.ndarray, List[Tuple[np.ndarray, np.ndarray]],
+           List[Tuple[np.ndarray, np.ndarray]]]:
+    """
+    Prepare data for a force plot with multiple instances.
+
+    Parameters
+    ----------
+    shap_values : np.ndarray
+        An array of SHAP values.
+
+    base_value : np.ndarray
+        Base values.
+
+    Returns
+    -------
+    x : np.ndarray
+        An array of x data.
+
+    pos_data : list
+        List of tuples of arrays for 'blue' intervals.
+
+    neg_data : list
+        List of tuples of arrays for 'red' intervals.
+
+    """
+    exps = [(np.sum(shap_values[k, :]) + base_value, shap_values[k, :])
+            for k in range(shap_values.shape[0])]
+
+    pos_data = []
+    pos_idxs = np.argsort(shap_values.clip(min=0).sum(axis=0))[::-1]
+    for i, k in enumerate(pos_idxs):
+        y_upper = np.array([(s - v[pos_idxs[:i]].clip(0).sum())
+                            for s, v in exps])
+        y_lower = np.array([(s - v[pos_idxs[:i + 1]].clip(0).sum())
+                            for s, v in exps])
+        pos_data.append((y_upper, y_lower))
+
+    neg_data = []
+    neg_idxs = np.argsort(shap_values.clip(max=0).sum(axis=0))
+    for i, k in enumerate(neg_idxs):
+        y_lower = np.array([(s - v[neg_idxs[:i]].clip(max=0).sum())
+                            for s, v in exps])
+        y_upper = np.array([(s - v[neg_idxs[:i + 1]].clip(max=0).sum())
+                            for s, v in exps])
+        neg_data.append((y_lower, y_upper))
+
+    return np.arange(shap_values.shape[0]), pos_data, neg_data
+
+
 if __name__ == "__main__":
-    from Orange.classification import LogisticRegressionLearner
+    import matplotlib.pyplot as plt
+    from Orange.classification import RandomForestLearner
+    from Orange.regression import RandomForestRegressionLearner
 
-    data_ = Table.from_file("heart_disease.tab")
-    learner = LogisticRegressionLearner()
-    model_ = learner(data_)
+    table = Table("housing")
+    if table.domain.has_continuous_class:
+        model_ = RandomForestRegressionLearner(
+            n_estimators=10, random_state=0)(table)
+    else:
+        model_ = RandomForestLearner(
+            n_estimators=10, random_state=0)(table)
 
-    shap_val, transformed_domain, mask, colors_ = get_shap_values_and_colors(
-        model_, data_
-    )
+    shap_values_, transformed_, _, base_value_ = \
+        compute_shap_values(model_, table[:50], table)
+
+    idxs = get_instance_ordering(shap_values_[0], None,
+                                 transformed_, SIMILARITY_ORDER)
+
+    x_data_, pos_data_, neg_data_ = \
+        prepare_force_plot_data_multi_inst(
+            shap_values_[0][idxs], base_value_[0]
+        )
+
+    for y1, y2 in pos_data_:
+        color = tuple(np.array(RGB_HIGH) / 255)
+        light_color = tuple((np.array(RGB_HIGH) +
+                             (255 - np.array(RGB_HIGH)) * 0.7) / 255)
+        plt.plot(x_data_, y1, color=light_color, linewidth=1)
+        plt.plot(x_data_, y2, color=light_color, linewidth=1)
+        plt.fill_between(x_data_, y1, y2, color=color)
+
+    for y1, y2 in neg_data_:
+        color = tuple(np.array(RGB_LOW) / 255)
+        light_color = tuple((np.array(RGB_LOW) +
+                             (255 - np.array(RGB_LOW)) * 0.7) / 255)
+        plt.plot(x_data_, y1, color=light_color, linewidth=1)
+        plt.plot(x_data_, y2, color=light_color, linewidth=1)
+        plt.fill_between(x_data_, y1, y2, color=color)
+    plt.show()

@@ -48,7 +48,7 @@ def run(data: Table, background_data: Table, model: Model, state: TaskState) \
         if state.is_interruption_requested():
             raise Exception
 
-    values, pred, data, base_value = explain_predictions(
+    values, pred, data, _, base_value = explain_predictions(
         model, data, background_data, callback)
     return RunnerResults(values=values, predictions=pred,
                          transformed_data=data, base_value=base_value)
