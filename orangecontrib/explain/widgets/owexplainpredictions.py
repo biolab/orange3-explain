@@ -575,10 +575,12 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
             mask = self.__results.mask
             data = self.__results.transformed_data[mask]
             domain = data.domain
-            attrs = [ContinuousVariable(a.name) for a in domain.attributes]
+            attrs = [ContinuousVariable(f"S({a.name})")
+                     for a in domain.attributes]
             domain = Domain(attrs, domain.class_vars, domain.metas)
             scores = self.__results.values[self.target_index]
             scores = Table(domain, scores, data.Y, data.metas)
+            scores.name = "Feature Scores"
         self.Outputs.scores.send(scores)
 
     def send_report(self):
