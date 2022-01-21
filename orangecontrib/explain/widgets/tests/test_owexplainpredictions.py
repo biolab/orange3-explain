@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 from AnyQt.QtCore import QPointF, Qt
+from AnyQt.QtGui import QFont
 from AnyQt.QtWidgets import QToolTip
 
 from Orange.base import Learner
@@ -264,12 +265,12 @@ class TestOWExplainPredictions(WidgetTest):
 
         self.widget.graph.set_axis = Mock()
         simulate.combobox_activate_index(self.widget._annot_combo, 3)
-        args = ([[(0, "1"), (1, "1"), (2, "0"), (3, "0"), (4, "0")]], True)
+        args = ([[(0, "1"), (1, "1"), (2, "0"), (3, "0"), (4, "0")]],)
         self.widget.graph.set_axis.assert_called_once_with(*args)
 
         self.widget.graph.set_axis.reset_mock()
         simulate.combobox_activate_index(self.widget._annot_combo, 1)
-        args = ([[(0, "2"), (1, "3"), (2, "1"), (3, "5"), (4, "4")]], False)
+        args = ([[(0, "2"), (1, "3"), (2, "1"), (3, "5"), (4, "4")]],)
         self.widget.graph.set_axis.assert_called_once_with(*args)
 
         self.send_signal(self.widget.Inputs.data, None)
@@ -289,14 +290,14 @@ class TestOWExplainPredictions(WidgetTest):
         self.widget.graph.set_axis.reset_mock()
         simulate.combobox_activate_index(self.widget._annot_combo, 3)
         self.widget.graph.set_data.assert_called_once()
-        args = ([[(0, "1"), (1, "1"), (2, "0"), (3, "0"), (4, "0")]], True)
+        args = ([[(0, "1"), (1, "1"), (2, "0"), (3, "0"), (4, "0")]],)
         self.widget.graph.set_axis.assert_called_once_with(*args)
 
         self.widget.graph.set_data.reset_mock()
         self.widget.graph.set_axis.reset_mock()
         simulate.combobox_activate_index(self.widget._order_combo, 4)
         self.widget.graph.set_data.assert_called_once()
-        args = ([[(0, "0"), (1, "0"), (2, "0"), (3, "1"), (4, "1")]], True)
+        args = ([[(0, "0"), (1, "0"), (2, "0"), (3, "1"), (4, "1")]],)
         self.widget.graph.set_axis.assert_called_once_with(*args)
 
     def test_plot(self):
@@ -479,8 +480,40 @@ class TestOWExplainPredictions(WidgetTest):
         output = self.get_output(w.Outputs.selected_data, widget=w)
         self.assertEqual(len(output), 5)
 
-    # def test_visual_settings(self):
-    #     self.assertEqual(True, False)
+    def test_visual_settings(self):
+        setter = self.widget.graph.parameter_setter
+
+        def test_settings():
+            font = QFont("Helvetica", italic=True, pointSize=20)
+            font.setPointSize(15)
+            for item in setter.axis_items:
+                self.assertFontEqual(item.style["tickFont"], font)
+
+            bottom_axis = setter.master.getAxis("bottom")
+            self.assertFalse(bottom_axis.style["rotateTicks"])
+
+        self.send_signal(self.widget.Inputs.data, self.heart[:10])
+        self.send_signal(self.widget.Inputs.background_data, self.heart)
+        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+        key, value = ("Fonts", "Font family", "Font family"), "Helvetica"
+        self.widget.set_visual_settings(key, value)
+
+        key, value = ("Fonts", "Axis ticks", "Font size"), 15
+        self.widget.set_visual_settings(key, value)
+        key, value = ("Fonts", "Axis ticks", "Italic"), True
+        self.widget.set_visual_settings(key, value)
+
+        key, value = ("Figure", "Bottom axis", "Vertical ticks"), False
+        self.widget.set_visual_settings(key, value)
+
+        test_settings()
+
+        self.send_signal(self.widget.Inputs.data, self.heart[:10])
+        test_settings()
+
+        self.send_signal(self.widget.Inputs.data, None)
+        self.send_signal(self.widget.Inputs.data, self.heart[:10])
+        test_settings()
 
     def test_send_report(self):
         self.widget.send_report()
@@ -498,6 +531,11 @@ class TestOWExplainPredictions(WidgetTest):
 
     def assertPlotEmpty(self, plot: ForcePlot):
         self.assertEqual(len(plot.plotItem.items), 0)
+
+    def assertFontEqual(self, font1: QFont, font2: QFont):
+        self.assertEqual(font1.family(), font2.family())
+        self.assertEqual(font1.pointSize(), font2.pointSize())
+        self.assertEqual(font1.italic(), font2.italic())
 
 
 if __name__ == "__main__":

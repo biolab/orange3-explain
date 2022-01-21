@@ -1,14 +1,18 @@
 from itertools import chain
 from types import SimpleNamespace
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Any
 from xml.sax.saxutils import escape
 
 import numpy as np
+
 from AnyQt.QtCore import QPointF, Qt, Signal, QRectF
 from AnyQt.QtGui import QTransform, QPainter
 from AnyQt.QtWidgets import QToolTip, QGraphicsSceneHelpEvent, QComboBox
+
 import pyqtgraph as pg
 from pyqtgraph.GraphicsScene.mouseEvents import MouseClickEvent, MouseDragEvent
+
+from orangewidget.utils.visual_settings_dlg import VisualSettingsDialog
 
 from Orange.base import Model
 from Orange.data import Table, Domain, ContinuousVariable, Variable
@@ -23,9 +27,12 @@ from Orange.widgets.utils.itemmodels import VariableListModel
 from Orange.widgets.utils.plot import OWPlotGUI, SELECT, PANNING, ZOOMING
 from Orange.widgets.utils.sql import check_sql_input
 from Orange.widgets.utils.widgetpreview import WidgetPreview
+from Orange.widgets.visualize.utils.customizableplot import \
+    CommonParameterSetter
 from Orange.widgets.visualize.utils.plotutils import HelpEventDelegate, \
     AxisItem
 from Orange.widgets.widget import Input, Output, OWWidget, Msg
+
 from orangecontrib.explain.explainer import explain_predictions, \
     prepare_force_plot_data_multi_inst, RGB_HIGH, RGB_LOW, \
     INSTANCE_ORDERINGS, get_instance_ordering
@@ -138,6 +145,39 @@ class ForcePlotViewBox(pg.ViewBox):
         self.sigDeselect.emit()
 
 
+class ParameterSetter(CommonParameterSetter):
+    BOTTOM_AXIS_LABEL = "Bottom axis"
+    IS_VERTICAL_LABEL = "Vertical ticks"
+
+    def __init__(self, parent):
+        super().__init__()
+        self.master: ForcePlot = parent
+
+    def update_setters(self):
+        self.initial_settings = {
+            self.LABELS_BOX: {
+                self.FONT_FAMILY_LABEL: self.FONT_FAMILY_SETTING,
+                self.AXIS_TICKS_LABEL: self.FONT_SETTING,
+            },
+            self.PLOT_BOX: {
+                self.BOTTOM_AXIS_LABEL: {self.IS_VERTICAL_LABEL: (None, True)}
+            }
+        }
+
+        def update_bottom_axis(**settings):
+            axis = self.master.getAxis("bottom")
+            axis.setRotateTicks(settings[self.IS_VERTICAL_LABEL])
+
+        self._setters[self.PLOT_BOX] = {
+            self.BOTTOM_AXIS_LABEL: update_bottom_axis
+        }
+
+    @property
+    def axis_items(self):
+        return [value["item"] for value in
+                self.master.getPlotItem().axes.values()]
+
+
 class ForcePlot(pg.PlotWidget):
     selectionChanged = Signal(list)
 
@@ -155,7 +195,7 @@ class ForcePlot(pg.PlotWidget):
 
         super().__init__(parent, viewBox=view_box,
                          background="w", enableMenu=False,
-                         axisItems={"bottom": AxisItem("bottom"),
+                         axisItems={"bottom": AxisItem("bottom", True),
                                     "left": AxisItem("left")})
         self.setAntialiasing(True)
         self.getPlotItem().setContentsMargins(10, 10, 10, 10)
@@ -163,6 +203,8 @@ class ForcePlot(pg.PlotWidget):
 
         self._tooltip_delegate = HelpEventDelegate(self.help_event)
         self.scene().installEventFilter(self._tooltip_delegate)
+
+        self.parameter_setter = ParameterSetter(self)
 
     def set_data(self, x_data: np.ndarray,
                  pos_y_data: List[Tuple[np.ndarray, np.ndarray]],
@@ -191,10 +233,9 @@ class ForcePlot(pg.PlotWidget):
                 )
                 self.addItem(fill)
 
-    def set_axis(self, ticks: Optional[List], rotate: bool):
+    def set_axis(self, ticks: Optional[List]):
         ax: AxisItem = self.getAxis("bottom")
         ax.setTicks(ticks)
-        ax.setRotateTicks(rotate)
 
     def clear_all(self):
         self.__data_bounds = None
@@ -323,6 +364,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     annot_index = ContextSetting(0)
     selection_ranges = Setting([], schema_only=True)
     auto_send = Setting(True)
+    visual_settings = Setting({}, schema_only=True)
 
     graph_name = "graph.plotItem"
 
@@ -345,6 +387,9 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         self._annot_combo: ForcePlot = None
 
         self.setup_gui()
+
+        initial_settings = self.graph.parameter_setter.initial_settings
+        VisualSettingsDialog(self, initial_settings)
 
     def setup_gui(self):
         self._add_plot()
@@ -484,7 +529,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         self.Error.unknown_err.clear()
         self.selection_ranges = []
         self.graph.clear_all()
-        self.graph.set_axis(None, False)
+        self.graph.set_axis(None)
         self.__data_idxs = None
 
     def setup_plot(self):
@@ -515,13 +560,13 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         if isinstance(annotator, Variable):
             ticks = [[(i, str(row[annotator].value)) for i, row in
                       enumerate(self.data[self.__data_idxs])]]
-            self.graph.set_axis(ticks, True)
+            self.graph.set_axis(ticks)
         elif annotator == "None":
-            self.graph.set_axis([], False)
+            self.graph.set_axis([])
         elif annotator == "Enumeration":
             ticks = [[(i, str(idx + 1)) for i, idx in
                       enumerate(self.__data_idxs)]]
-            self.graph.set_axis(ticks, False)
+            self.graph.set_axis(ticks)
         else:
             raise NotImplementedError(annotator)
 
@@ -592,6 +637,10 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
             items["Target class"] = class_var.values[self.target_index]
         self.report_items(items)
         self.report_plot()
+
+    def set_visual_settings(self, key: Tuple[str, str, str], value: Any):
+        self.visual_settings[key] = value
+        self.graph.parameter_setter.set_parameter(key, value)
 
 
 if __name__ == "__main__":
