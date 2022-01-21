@@ -382,7 +382,8 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         self.data: Optional[Table] = None
         # cached instance indices after instance ordering
         self.__data_idxs: Optional[np.ndarray] = None
-        self.__pending_selection: List[int] = self.selection_ranges
+        self.__pending_selection: List[Tuple[float, float]] = \
+            self.selection_ranges
 
         self.graph: ForcePlot = None
         self._target_combo: QComboBox = None
