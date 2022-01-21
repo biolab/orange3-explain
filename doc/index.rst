@@ -11,6 +11,7 @@ Widgets
    widgets/permutation-importance
    widgets/explain-model
    widgets/explain-prediction
+   widgets/explain-predictions
 
 Indices and tables
 ==================
