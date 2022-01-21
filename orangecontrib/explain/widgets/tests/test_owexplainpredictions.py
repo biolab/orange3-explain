@@ -169,9 +169,13 @@ class TestOWExplainPredictions(WidgetTest):
         self.send_signal(self.widget.Inputs.data, titanic)
         self.send_signal(self.widget.Inputs.model, model)
         self.wait_until_finished()
+        self.assertTrue(self.widget.Information.data_sampled.is_shown())
 
         output = self.get_output(self.widget.Outputs.scores)
         self.assertEqual(len(output), 1000)
+
+        self.send_signal(self.widget.Inputs.data, None)
+        self.assertFalse(self.widget.Information.data_sampled.is_shown())
 
     def test_classification_data_classification_model(self):
         self.send_signal(self.widget.Inputs.background_data, self.heart)

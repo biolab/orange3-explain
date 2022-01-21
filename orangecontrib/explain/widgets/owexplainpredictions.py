@@ -356,6 +356,9 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         unknown_err = Msg("{}")
         not_enough_data = Msg("At least two instances are needed.")
 
+    class Information(OWWidget.Information):
+        data_sampled = Msg("Data has been sampled.")
+
     buttons_area_orientation = Qt.Vertical
 
     settingsHandler = PerfectDomainContextHandler()
@@ -527,6 +530,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         self.cancel()
         self.Error.domain_transform_err.clear()
         self.Error.unknown_err.clear()
+        self.Information.data_sampled.clear()
         self.selection_ranges = []
         self.graph.clear_all()
         self.graph.set_axis(None)
@@ -538,16 +542,19 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         if not self.__results or not self.data:
             return
 
-        self.__data_idxs = get_instance_ordering(
+        values_idxs = get_instance_ordering(
             self.__results.values[self.target_index],
-            self.__results.predictions[:, self.target_index],
-            self.data,
+            self.__results.predictions[self.__results.mask, self.target_index],
+            self.data[self.__results.mask],
             self._order_combo.model()[self.order_index]
         )
 
+        data_idxs = np.arange(len(self.data))
+        self.__data_idxs = data_idxs[self.__results.mask][values_idxs]
+
         x_data, pos_y_data, neg_y_data = \
             prepare_force_plot_data_multi_inst(
-                self.__results.values[self.target_index][self.__data_idxs],
+                self.__results.values[self.target_index][values_idxs],
                 self.__results.base_value[self.target_index]
             )
 
@@ -575,6 +582,8 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
 
     def on_done(self, results: Optional[RunnerResults]):
         self.__results = results
+        if results is not None and not all(results.mask):
+            self.Information.data_sampled()
         self.setup_plot()
         self.apply_selection()
         self.output_scores()
