@@ -5,8 +5,8 @@ from xml.sax.saxutils import escape
 
 import numpy as np
 
-from AnyQt.QtCore import QPointF, Qt, Signal, QRectF
-from AnyQt.QtGui import QTransform, QPainter
+from AnyQt.QtCore import QPointF, Qt, Signal, QRectF, QEvent
+from AnyQt.QtGui import QTransform, QPainter, QColor, QPainterPath, QPolygonF
 from AnyQt.QtWidgets import QToolTip, QGraphicsSceneHelpEvent, QComboBox
 
 import pyqtgraph as pg
@@ -179,6 +179,16 @@ class ParameterSetter(CommonParameterSetter):
                 self.master.getPlotItem().axes.values()]
 
 
+class FillBetweenItem(pg.FillBetweenItem):
+    def __init__(self, rgb: List[int], *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__rgb = rgb
+
+    @property
+    def rgb(self) -> List[int]:
+        return self.__rgb
+
+
 class ForcePlot(pg.PlotWidget):
     selectionChanged = Signal(list)
 
@@ -187,6 +197,7 @@ class ForcePlot(pg.PlotWidget):
                                            Tuple[float, float]]] = None
         self.__tooltip_data: Optional[Table] = None
 
+        self.__fill_items: List[pg.FillBetweenItem] = []
         self.__selection: List = []
         self.__selection_rect_items: List[SelectionRect] = []
 
@@ -201,11 +212,30 @@ class ForcePlot(pg.PlotWidget):
         self.setAntialiasing(True)
         self.getPlotItem().setContentsMargins(10, 10, 10, 10)
         self.getPlotItem().buttonsHidden = True
+        self.getPlotItem().scene().sigMouseMoved.connect(self.__on_mouse_moved)
 
         self._tooltip_delegate = HelpEventDelegate(self.help_event)
         self.scene().installEventFilter(self._tooltip_delegate)
 
         self.parameter_setter = ParameterSetter(self)
+
+    def __on_mouse_moved(self, point: QPointF):
+        pos: QPointF = self.getPlotItem().vb.mapSceneToView(point)
+        x, y = pos.x(), pos.y()
+        index = int(round(x, 0))
+        if index < 0:
+            return
+
+        for item in self.__fill_items:
+            color = QColor(*item.rgb)
+            if self._contains_point(item, pos):
+                color = color.darker(120)
+            item.setBrush(pg.mkBrush(color))
+
+    def leaveEvent(self, ev: QEvent):
+        super().leaveEvent(ev)
+        for item in self.__fill_items:
+            item.setBrush(pg.mkBrush(QColor(*item.rgb)))
 
     def set_data(self, x_data: np.ndarray,
                  pos_y_data: List[Tuple[np.ndarray, np.ndarray]],
@@ -230,10 +260,11 @@ class ForcePlot(pg.PlotWidget):
             pen = pg.mkPen(whiter_rgb, width=1)
             brush = pg.mkBrush(rgb)
             for y_top, y_bottom in data:
-                fill = pg.FillBetweenItem(
-                    pg.PlotDataItem(x=x_data, y=y_bottom),
+                fill = FillBetweenItem(
+                    rgb, pg.PlotDataItem(x=x_data, y=y_bottom),
                     pg.PlotDataItem(x=x_data, y=y_top), pen=pen, brush=brush
                 )
+                self.__fill_items.append(fill)
                 self.addItem(fill)
 
     def _set_axes(self, x_label: str, y_label: str):
@@ -252,6 +283,7 @@ class ForcePlot(pg.PlotWidget):
     def clear_all(self):
         self.__data_bounds = None
         self.__tooltip_data = None
+        self.__fill_items.clear()
         self.getViewBox().set_data_bounds(self.__data_bounds)
         self.clear()
         self._clear_selection()
@@ -345,6 +377,19 @@ class ForcePlot(pg.PlotWidget):
                  ("Feature", "Features", 10, domain.attributes))
 
         return "<br/>".join(show_part(*columns) for columns in parts)
+
+    @staticmethod
+    def _contains_point(item: pg.FillBetweenItem, point: QPointF) -> bool:
+        curve1, curve2 = item.curves
+        x_data_lower, y_data_lower = curve1.curve.getData()
+        x_data_upper, y_data_upper = curve2.curve.getData()
+        pts = [QPointF(x, y) for x, y in zip(x_data_lower, y_data_lower)]
+        pts += [QPointF(x, y) for x, y in
+                reversed(list(zip(x_data_upper, y_data_upper)))]
+        pts += pts[:1]
+        path = QPainterPath()
+        path.addPolygon(QPolygonF(pts))
+        return path.contains(point)
 
 
 class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):

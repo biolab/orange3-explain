@@ -645,7 +645,7 @@ def prepare_force_plot_data_multi_inst(
                             for s, v in exps])
         y_upper = np.array([(s - v[neg_idxs[:i + 1]].clip(max=0).sum())
                             for s, v in exps])
-        neg_data.append((y_lower, y_upper))
+        neg_data.append((y_upper, y_lower))
 
     return np.arange(shap_values.shape[0]), pos_data, neg_data
 
