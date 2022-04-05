@@ -157,6 +157,7 @@ class ParameterSetter(CommonParameterSetter):
         self.initial_settings = {
             self.LABELS_BOX: {
                 self.FONT_FAMILY_LABEL: self.FONT_FAMILY_SETTING,
+                self.AXIS_TITLE_LABEL: self.FONT_SETTING,
                 self.AXIS_TICKS_LABEL: self.FONT_SETTING,
             },
             self.PLOT_BOX: {
@@ -209,6 +210,7 @@ class ForcePlot(pg.PlotWidget):
     def set_data(self, x_data: np.ndarray,
                  pos_y_data: List[Tuple[np.ndarray, np.ndarray]],
                  neg_y_data: List[Tuple[np.ndarray, np.ndarray]],
+                 x_label: str, y_label: str,
                  tooltip_data: Table):
 
         self.__data_bounds = ((np.nanmin(x_data), np.nanmax(x_data)),
@@ -217,6 +219,7 @@ class ForcePlot(pg.PlotWidget):
 
         self.getViewBox().set_data_bounds(self.__data_bounds)
         self._set_range()
+        self._set_axes(x_label, y_label)
         self._plot_data(x_data, pos_y_data, neg_y_data)
 
     def _plot_data(self, x_data: np.ndarray,
@@ -233,6 +236,15 @@ class ForcePlot(pg.PlotWidget):
                 )
                 self.addItem(fill)
 
+    def _set_axes(self, x_label: str, y_label: str):
+        bottom_axis: AxisItem = self.getAxis("bottom")
+        bottom_axis.setLabel(x_label)
+        bottom_axis.resizeEvent(None)
+
+        left_axis: AxisItem = self.getAxis("left")
+        left_axis.setLabel(y_label)
+        left_axis.resizeEvent(None)
+
     def set_axis(self, ticks: Optional[List]):
         ax: AxisItem = self.getAxis("bottom")
         ax.setTicks(ticks)
@@ -243,6 +255,7 @@ class ForcePlot(pg.PlotWidget):
         self.getViewBox().set_data_bounds(self.__data_bounds)
         self.clear()
         self._clear_selection()
+        self._set_axes(None, None)
 
     def _clear_selection(self):
         self.__selection = []
@@ -543,11 +556,12 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         if not self.__results or not self.data:
             return
 
+        order = self._order_combo.model()[self.order_index]
         values_idxs = get_instance_ordering(
             self.__results.values[self.target_index],
             self.__results.predictions[self.__results.mask, self.target_index],
             self.data[self.__results.mask],
-            self._order_combo.model()[self.order_index]
+            order
         )
 
         data_idxs = np.arange(len(self.data))
@@ -559,7 +573,21 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
                 self.__results.base_value[self.target_index]
             )
 
+        if self.order_index == 0:
+            order = "hierarhical clustering"
+        elif self.order_index == 1:
+            order = "output value"
+        elif self.order_index == 2:
+            order = "original ordering"
+        x_label = f"Instances ordered by {order}"
+
+        target = self.model.domain.class_var
+        if self.model.domain.has_discrete_class:
+            target = f"{target} = {target.values[self.target_index]}"
+        y_label = f"Output value ({target})"
+
         self.graph.set_data(x_data, pos_y_data, neg_y_data,
+                            x_label, y_label,
                             self.data[self.__data_idxs])
         self._set_plot_annotations()
 
