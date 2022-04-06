@@ -6,7 +6,8 @@ from xml.sax.saxutils import escape
 import numpy as np
 
 from AnyQt.QtCore import QPointF, Qt, Signal, QRectF, QEvent
-from AnyQt.QtGui import QTransform, QPainter, QColor, QPainterPath, QPolygonF
+from AnyQt.QtGui import QTransform, QPainter, QColor, QPainterPath, \
+    QPolygonF, QMouseEvent
 from AnyQt.QtWidgets import QToolTip, QGraphicsSceneHelpEvent, QComboBox
 
 import pyqtgraph as pg
@@ -195,7 +196,10 @@ class ForcePlot(pg.PlotWidget):
     def __init__(self, parent: OWWidget):
         self.__data_bounds: Optional[Tuple[Tuple[float, float],
                                            Tuple[float, float]]] = None
+        self.__pos_labels: Optional[List[str]] = None
+        self.__neg_labels: Optional[List[str]] = None
         self.__tooltip_data: Optional[Table] = None
+        self.__mouse_pressed = False
 
         self.__fill_items: List[pg.FillBetweenItem] = []
         self.__selection: List = []
@@ -220,31 +224,59 @@ class ForcePlot(pg.PlotWidget):
         self.parameter_setter = ParameterSetter(self)
 
     def __on_mouse_moved(self, point: QPointF):
-        pos: QPointF = self.getPlotItem().vb.mapSceneToView(point)
+        pos: QPointF = self.getViewBox().mapSceneToView(point)
         x, y = pos.x(), pos.y()
-        index = int(round(x, 0))
-        if index < 0:
+        if int(round(x, 0)) < 0 or self.__mouse_pressed:
             return
 
-        for item in self.__fill_items:
-            color = QColor(*item.rgb)
+        self.__unhighlight()
+
+        for index, item in enumerate(self.__fill_items):
             if self._contains_point(item, pos):
-                color = color.darker(120)
-            item.setBrush(pg.mkBrush(color))
+                n = len(self.__neg_labels)
+                if index < n:
+                    name = self.__pos_labels[index]
+                    index_other = self.__neg_labels.index(name) + n
+                else:
+                    name = self.__neg_labels[index - n]
+                    index_other = self.__pos_labels.index(name)
+
+                for i in (index, index_other):
+                    item = self.__fill_items[i]
+                    color = QColor(*item.rgb)
+                    color = color.darker(120)
+                    item.setBrush(pg.mkBrush(color))
+
+                break
+
+    def mousePressEvent(self, ev: QMouseEvent):
+        self.__mouse_pressed = True
+        self.__unhighlight()
+        super().mousePressEvent(ev)
+
+    def mouseReleaseEvent(self, ev: QMouseEvent):
+        super().mouseReleaseEvent(ev)
+        self.__mouse_pressed = False
 
     def leaveEvent(self, ev: QEvent):
         super().leaveEvent(ev)
+        self.__unhighlight()
+
+    def __unhighlight(self):
         for item in self.__fill_items:
-            item.setBrush(pg.mkBrush(QColor(*item.rgb)))
+            item.setBrush(pg.mkBrush(*item.rgb))
 
     def set_data(self, x_data: np.ndarray,
                  pos_y_data: List[Tuple[np.ndarray, np.ndarray]],
                  neg_y_data: List[Tuple[np.ndarray, np.ndarray]],
+                 pos_labels: List[str], neg_labels: List[str],
                  x_label: str, y_label: str,
                  tooltip_data: Table):
 
         self.__data_bounds = ((np.nanmin(x_data), np.nanmax(x_data)),
                               (np.nanmin(pos_y_data), np.nanmax(neg_y_data)))
+        self.__pos_labels = pos_labels
+        self.__neg_labels = neg_labels
         self.__tooltip_data = tooltip_data
 
         self.getViewBox().set_data_bounds(self.__data_bounds)
@@ -612,10 +644,11 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         data_idxs = np.arange(len(self.data))
         self.__data_idxs = data_idxs[self.__results.mask][values_idxs]
 
-        x_data, pos_y_data, neg_y_data = \
+        x_data, pos_y_data, neg_y_data, pos_labels, neg_labels = \
             prepare_force_plot_data_multi_inst(
                 self.__results.values[self.target_index][values_idxs],
-                self.__results.base_value[self.target_index]
+                self.__results.base_value[self.target_index],
+                self.model.domain
             )
 
         if self.order_index == 0:
@@ -632,7 +665,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         y_label = f"Output value ({target})"
 
         self.graph.set_data(x_data, pos_y_data, neg_y_data,
-                            x_label, y_label,
+                            pos_labels, neg_labels, x_label, y_label,
                             self.data[self.__data_idxs])
         self._set_plot_annotations()
 

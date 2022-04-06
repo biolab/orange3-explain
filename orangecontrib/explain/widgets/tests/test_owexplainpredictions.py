@@ -74,7 +74,9 @@ class TestForcePlot(WidgetTest):
         x_data = np.arange(5)
         pos_y_data = [(np.arange(5) - 1, np.arange(5))]
         neg_y_data = [(np.arange(5), np.arange(5) + 1)]
-        self.plot.set_data(x_data, pos_y_data, neg_y_data, "", "", self.housing)
+        labels = [a.name for a in self.housing.domain.attributes]
+        self.plot.set_data(x_data, pos_y_data, neg_y_data, "", "",
+                           labels, labels, self.housing)
 
         # select after data is sent
         view_box.mouseDragEvent(event)
@@ -107,7 +109,9 @@ class TestForcePlot(WidgetTest):
         pos_y_data = [(np.arange(5) - 1, np.arange(5))]
         neg_y_data = [(np.arange(5), np.arange(5) + 1)]
         data = self.housing[:5, :2]
-        self.plot.set_data(x_data, pos_y_data, neg_y_data, "", "", data)
+        labels = [a.name for a in data.domain.attributes]
+        self.plot.set_data(x_data, pos_y_data, neg_y_data, "", "",
+                           labels, labels, data)
 
         event = Mock()
         point = self.plot.getViewBox().mapViewToScene(QPointF(1, 2))
@@ -118,7 +122,8 @@ class TestForcePlot(WidgetTest):
             "<br/><br/><b>Features</b>:<br/>CRIM = 0.02731<br/>ZN = 0.0"
         )
 
-        self.plot.set_data(x_data, pos_y_data, neg_y_data, "", "", data)
+        self.plot.set_data(x_data, pos_y_data, neg_y_data, "", "",
+                           labels, labels, data)
 
         event = Mock()
         point = self.plot.getViewBox().mapViewToScene(QPointF(1, 2))

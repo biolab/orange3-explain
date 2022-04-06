@@ -348,8 +348,8 @@ class TestExplainer(unittest.TestCase):
             shap_values[0], predictions[:, 0],
             self.iris[:3], INSTANCE_ORDERINGS[2])
 
-        x_data, pos_data, neg_data = prepare_force_plot_data_multi_inst(
-            shap_values[0][idxs], base_value[0])
+        x_data, pos_data, neg_data, _, _ = prepare_force_plot_data_multi_inst(
+            shap_values[0][idxs], base_value[0], self.iris.domain)
 
         np.testing.assert_array_equal(x_data, np.arange(3))
         self.assertEqual(len(pos_data), 4)
@@ -386,8 +386,8 @@ class TestExplainer(unittest.TestCase):
             shap_values[0], predictions[:, 0],
             self.iris[:3], self.iris.domain[0])
 
-        x_data, pos_data, neg_data = prepare_force_plot_data_multi_inst(
-            shap_values[0][idxs], base_value[0])
+        x_data, pos_data, neg_data, _, _ = prepare_force_plot_data_multi_inst(
+            shap_values[0][idxs], base_value[0], self.iris.domain)
 
         np.testing.assert_array_equal(x_data, np.arange(3))
         self.assertEqual(len(pos_data), 4)

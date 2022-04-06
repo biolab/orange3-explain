@@ -600,9 +600,10 @@ def get_instance_ordering(
 
 def prepare_force_plot_data_multi_inst(
         shap_values: np.ndarray,
-        base_value: float
+        base_value: float,
+        transformed_domain: Domain
 ) -> Tuple[np.ndarray, List[Tuple[np.ndarray, np.ndarray]],
-           List[Tuple[np.ndarray, np.ndarray]]]:
+           List[Tuple[np.ndarray, np.ndarray]], List[str], List[str]]:
     """
     Prepare data for a force plot with multiple instances.
 
@@ -614,22 +615,33 @@ def prepare_force_plot_data_multi_inst(
     base_value : np.ndarray
         Base values.
 
+    transformed_domain : Domain
+        Transformed data domain.
+
     Returns
     -------
     x : np.ndarray
         An array of x data.
 
     pos_data : list
-        List of tuples of arrays for 'blue' intervals.
-
-    neg_data : list
         List of tuples of arrays for 'red' intervals.
 
+    neg_data : list
+        List of tuples of arrays for 'blue' intervals.
+
+    pos_labels : list
+        List of labels for 'red' intervals.
+
+    neg_data : list
+        List of labels for 'blue' intervals.
+
     """
+    attributes = transformed_domain.attributes
     exps = [(np.sum(shap_values[k, :]) + base_value, shap_values[k, :])
             for k in range(shap_values.shape[0])]
 
     pos_data = []
+    pos_labels = []
     pos_idxs = np.argsort(shap_values.clip(min=0).sum(axis=0))[::-1]
     for i, k in enumerate(pos_idxs):
         y_upper = np.array([(s - v[pos_idxs[:i]].clip(0).sum())
@@ -637,8 +649,10 @@ def prepare_force_plot_data_multi_inst(
         y_lower = np.array([(s - v[pos_idxs[:i + 1]].clip(0).sum())
                             for s, v in exps])
         pos_data.append((y_upper, y_lower))
+        pos_labels.append(attributes[k].name)
 
     neg_data = []
+    neg_labels = []
     neg_idxs = np.argsort(shap_values.clip(max=0).sum(axis=0))
     for i, k in enumerate(neg_idxs):
         y_lower = np.array([(s - v[neg_idxs[:i]].clip(max=0).sum())
@@ -646,8 +660,10 @@ def prepare_force_plot_data_multi_inst(
         y_upper = np.array([(s - v[neg_idxs[:i + 1]].clip(max=0).sum())
                             for s, v in exps])
         neg_data.append((y_upper, y_lower))
+        neg_labels.append(attributes[k].name)
 
-    return np.arange(shap_values.shape[0]), pos_data, neg_data
+    return (np.arange(shap_values.shape[0]),
+            pos_data, neg_data, pos_labels, neg_labels)
 
 
 if __name__ == "__main__":
@@ -669,9 +685,9 @@ if __name__ == "__main__":
     idxs = get_instance_ordering(shap_values_[0], None,
                                  transformed_, SIMILARITY_ORDER)
 
-    x_data_, pos_data_, neg_data_ = \
+    x_data_, pos_data_, neg_data_, pos_labels_, neg_labels_ = \
         prepare_force_plot_data_multi_inst(
-            shap_values_[0][idxs], base_value_[0]
+            shap_values_[0][idxs], base_value_[0], transformed_.domain
         )
 
     for y1, y2 in pos_data_:
