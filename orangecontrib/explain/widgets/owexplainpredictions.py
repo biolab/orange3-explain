@@ -8,7 +8,7 @@ import numpy as np
 from AnyQt.QtCore import QPointF, Qt, Signal, QRectF, QEvent
 from AnyQt.QtGui import QTransform, QPainter, QColor, QPainterPath, \
     QPolygonF, QMouseEvent
-from AnyQt.QtWidgets import QToolTip, QGraphicsSceneHelpEvent, QComboBox
+from AnyQt.QtWidgets import QComboBox
 
 import pyqtgraph as pg
 from pyqtgraph.GraphicsScene.mouseEvents import MouseClickEvent, MouseDragEvent
@@ -17,7 +17,7 @@ from orangewidget.utils.visual_settings_dlg import VisualSettingsDialog
 
 from Orange.base import Model
 from Orange.data import Table, Domain, ContinuousVariable, Variable
-from Orange.data.table import DomainTransformationError, RowInstance
+from Orange.data.table import DomainTransformationError
 from Orange.widgets import gui
 from Orange.widgets.settings import ContextSetting, Setting, \
     PerfectDomainContextHandler
@@ -30,8 +30,7 @@ from Orange.widgets.utils.sql import check_sql_input
 from Orange.widgets.utils.widgetpreview import WidgetPreview
 from Orange.widgets.visualize.utils.customizableplot import \
     CommonParameterSetter
-from Orange.widgets.visualize.utils.plotutils import HelpEventDelegate, \
-    AxisItem
+from Orange.widgets.visualize.utils.plotutils import AxisItem
 from Orange.widgets.widget import Input, Output, OWWidget, Msg
 
 from orangecontrib.explain.explainer import explain_predictions, \
@@ -202,12 +201,15 @@ class ForcePlot(pg.PlotWidget):
         self.__mouse_pressed = False
 
         self.__fill_items: List[pg.FillBetweenItem] = []
+        self.__text_items: List[pg.TextItem] = []
+        self.__dot_items: List[pg.ScatterPlotItem] = []
         self.__selection: List = []
         self.__selection_rect_items: List[SelectionRect] = []
 
         view_box = ForcePlotViewBox()
         view_box.sigSelectionChanged.connect(self._update_selection)
         view_box.sigDeselect.connect(self._deselect)
+        view_box.sigRangeChangedManually.connect(self.__on_range_changed)
 
         super().__init__(parent, viewBox=view_box,
                          background="w", enableMenu=False,
@@ -218,53 +220,27 @@ class ForcePlot(pg.PlotWidget):
         self.getPlotItem().buttonsHidden = True
         self.getPlotItem().scene().sigMouseMoved.connect(self.__on_mouse_moved)
 
-        self._tooltip_delegate = HelpEventDelegate(self.help_event)
-        self.scene().installEventFilter(self._tooltip_delegate)
-
         self.parameter_setter = ParameterSetter(self)
 
+    def __on_range_changed(self):
+        scene: pg.GraphicsScene = self.getPlotItem().scene()
+        if scene.lastHoverEvent is not None:
+            self.__clear_tooltips()
+            point = scene.lastHoverEvent.scenePos()
+            self.__show_tooltip(self.getViewBox().mapSceneToView(point))
+
     def __on_mouse_moved(self, point: QPointF):
-        pos: QPointF = self.getViewBox().mapSceneToView(point)
-        x, y = pos.x(), pos.y()
-        if int(round(x, 0)) < 0 or self.__mouse_pressed:
+        self.__clear_hover()
+
+        view_box: ForcePlotViewBox = self.getViewBox()
+        view_pos: QPointF = view_box.mapSceneToView(point)
+        (xmin, xmax), (ymin, ymax) = view_box.viewRange()
+        in_view = xmin <= view_pos.x() <= xmax and ymin <= view_pos.y() <= ymax
+        if not in_view or self.__mouse_pressed:
             return
 
-        self.__unhighlight()
-
-        for index, item in enumerate(self.__fill_items):
-            if self._contains_point(item, pos):
-                n = len(self.__neg_labels)
-                if index < n:
-                    name = self.__pos_labels[index]
-                    index_other = self.__neg_labels.index(name) + n
-                else:
-                    name = self.__neg_labels[index - n]
-                    index_other = self.__pos_labels.index(name)
-
-                for i in (index, index_other):
-                    item = self.__fill_items[i]
-                    color = QColor(*item.rgb)
-                    color = color.darker(120)
-                    item.setBrush(pg.mkBrush(color))
-
-                break
-
-    def mousePressEvent(self, ev: QMouseEvent):
-        self.__mouse_pressed = True
-        self.__unhighlight()
-        super().mousePressEvent(ev)
-
-    def mouseReleaseEvent(self, ev: QMouseEvent):
-        super().mouseReleaseEvent(ev)
-        self.__mouse_pressed = False
-
-    def leaveEvent(self, ev: QEvent):
-        super().leaveEvent(ev)
-        self.__unhighlight()
-
-    def __unhighlight(self):
-        for item in self.__fill_items:
-            item.setBrush(pg.mkBrush(*item.rgb))
+        self.__hightlight(view_pos)
+        self.__show_tooltip(view_pos)
 
     def set_data(self, x_data: np.ndarray,
                  pos_y_data: List[Tuple[np.ndarray, np.ndarray]],
@@ -316,6 +292,8 @@ class ForcePlot(pg.PlotWidget):
         self.__data_bounds = None
         self.__tooltip_data = None
         self.__fill_items.clear()
+        self.__text_items.clear()
+        self.__dot_items.clear()
         self.getViewBox().set_data_bounds(self.__data_bounds)
         self.clear()
         self._clear_selection()
@@ -375,40 +353,99 @@ class ForcePlot(pg.PlotWidget):
         view_box.setXRange(*x_range, padding=0)
         view_box.setYRange(*y_range, padding=0.1)
 
-    def help_event(self, event: QGraphicsSceneHelpEvent) -> bool:
-        if self.__tooltip_data is None:
-            return False
+    def __hightlight(self, point: QPointF):
+        for index, item in enumerate(self.__fill_items):
+            if self._contains_point(item, point):
+                n = len(self.__neg_labels)
+                if index < n:
+                    name = self.__pos_labels[index]
+                    index_other = self.__neg_labels.index(name) + n
+                else:
+                    name = self.__neg_labels[index - n]
+                    index_other = self.__pos_labels.index(name)
 
-        point: QPointF = self.getViewBox().mapSceneToView(event.scenePos())
-        index = int(round(point.x(), 0))
+                for i in (index, index_other):
+                    item = self.__fill_items[i]
+                    color = QColor(*item.rgb)
+                    color = color.darker(120)
+                    item.setBrush(pg.mkBrush(color))
 
-        if 0 <= index < len(self.__tooltip_data):
-            text = self._instance_tooltip(self.__tooltip_data.domain,
-                                          self.__tooltip_data[index])
-            QToolTip.showText(event.screenPos(), text, widget=self)
-            return True
-        return False
+                break
 
-    @staticmethod
-    def _instance_tooltip(domain: Domain, instance: RowInstance) -> str:
-        def show_part(singular, plural, max_shown, variables):
-            cols = [escape(f"{var.name} = {instance[var]}")
-                    for var in variables[:max_shown + 2]][:max_shown]
-            if not cols:
-                return ""
+    def __show_tooltip(self, point: QPointF):
+        instance_index = int(round(point.x(), 0))
+        if self.__tooltip_data is None or instance_index < 0 or \
+                instance_index >= len(self.__tooltip_data):
+            return
 
-            n_vars = len(variables)
-            if n_vars > max_shown:
-                cols[-1] = f"... and {n_vars - max_shown + 1} others"
+        instance = self.__tooltip_data[instance_index]
+        n_features = len(self.__fill_items) // 2
+        pos_fills = self.__fill_items[:n_features]
+        neg_fills = self.__fill_items[n_features:]
+        pos_labels = self.__pos_labels
+        neg_labels = self.__neg_labels
 
-            tag = singular if n_vars < 2 else plural
-            return f"<b>{tag}</b>:<br/>" + "<br/>".join(cols)
+        view_box: ForcePlotViewBox = self.getViewBox()
+        px_width, px_height = view_box.viewPixelSize()
+        pos = view_box.mapViewToScene(point)
+        right_side = view_box.boundingRect().width() / 2 > pos.x()
+        for rgb, labels, fill_items in ((RGB_HIGH, pos_labels, pos_fills),
+                                        (RGB_LOW, neg_labels, neg_fills)):
+            whiter_rgb = np.array(rgb) + (255 - np.array(rgb)) * 0.7
+            for i, (label, fill_item) in enumerate(zip(labels, fill_items)):
+                curve1, curve2 = fill_item.curves
+                y_lower = curve1.curve.getData()[1][instance_index]
+                y_upper = curve2.curve.getData()[1][instance_index]
+                delta_y = y_upper - y_lower
+                text_item = pg.TextItem(
+                    text=escape(f"{label} = {instance[label]}"),
+                    color=rgb, fill=pg.mkBrush(whiter_rgb)
+                )
+                height = text_item.boundingRect().height() * px_height * 2
+                if height < delta_y or self._contains_point(fill_item, point):
+                    if right_side:
+                        x_pos = instance_index + px_width * 5
+                    else:
+                        x_pos = instance_index - px_width * 5
+                        x_pos -= px_width * text_item.boundingRect().width()
+                    y_pos = y_upper - delta_y / 2
 
-        parts = (("Class", "Classes", 4, domain.class_vars),
-                 ("Meta", "Metas", 4, domain.metas),
-                 ("Feature", "Features", 10, domain.attributes))
+                    text_item.setPos(x_pos, y_pos)
+                    self.__text_items.append(text_item)
+                    self.addItem(text_item)
 
-        return "<br/>".join(show_part(*columns) for columns in parts)
+                    dot_item = pg.ScatterPlotItem(
+                        x=[instance_index], y=[y_pos],
+                        size=4, brush=pg.mkBrush(QColor(Qt.black))
+                    )
+                    self.__dot_items.append(dot_item)
+                    self.addItem(dot_item)
+
+    def __clear_hover(self):
+        for item in self.__fill_items:
+            item.setBrush(pg.mkBrush(*item.rgb))
+        self.__clear_tooltips()
+
+    def __clear_tooltips(self):
+        for item in self.__text_items:
+            self.removeItem(item)
+        self.__text_items.clear()
+        for item in self.__dot_items:
+            self.removeItem(item)
+        self.__dot_items.clear()
+
+    def mousePressEvent(self, ev: QMouseEvent):
+        self.__mouse_pressed = True
+        self.__clear_hover()
+        super().mousePressEvent(ev)
+
+    def mouseReleaseEvent(self, ev: QMouseEvent):
+        super().mouseReleaseEvent(ev)
+        self.__mouse_pressed = False
+
+    def leaveEvent(self, ev: QEvent):
+        super().leaveEvent(ev)
+        self.__clear_hover()
 
     @staticmethod
     def _contains_point(item: pg.FillBetweenItem, point: QPointF) -> bool:
