@@ -198,6 +198,8 @@ class ForcePlot(pg.PlotWidget):
         self.__pos_labels: Optional[List[str]] = None
         self.__neg_labels: Optional[List[str]] = None
         self.__tooltip_data: Optional[Table] = None
+        self.__show_tooltips = True
+        self.__highlight_feature = True
         self.__mouse_pressed = False
 
         self.__fill_items: List[pg.FillBetweenItem] = []
@@ -288,6 +290,12 @@ class ForcePlot(pg.PlotWidget):
         ax: AxisItem = self.getAxis("bottom")
         ax.setTicks(ticks)
 
+    def set_show_tooltip(self, show: bool):
+        self.__show_tooltips = show
+
+    def set_highlight_feature(self, highlight: bool):
+        self.__highlight_feature = highlight
+
     def clear_all(self):
         self.__data_bounds = None
         self.__tooltip_data = None
@@ -354,6 +362,8 @@ class ForcePlot(pg.PlotWidget):
         view_box.setYRange(*y_range, padding=0.1)
 
     def __hightlight(self, point: QPointF):
+        if not self.__highlight_feature:
+            return
         for index, item in enumerate(self.__fill_items):
             if self._contains_point(item, point):
                 n = len(self.__neg_labels)
@@ -373,6 +383,8 @@ class ForcePlot(pg.PlotWidget):
                 break
 
     def __show_tooltip(self, point: QPointF):
+        if not self.__show_tooltips:
+            return
         instance_index = int(round(point.x(), 0))
         if self.__tooltip_data is None or instance_index < 0 or \
                 instance_index >= len(self.__tooltip_data):
@@ -492,6 +504,8 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     target_index = ContextSetting(0)
     order_index = ContextSetting(0)
     annot_index = ContextSetting(0)
+    show_tooltip = Setting(True)
+    highlight_feature = Setting(True)
     selection_ranges = Setting([], schema_only=True)
     auto_send = Setting(True)
     visual_settings = Setting({}, schema_only=True)
@@ -514,8 +528,8 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
 
         self.graph: ForcePlot = None
         self._target_combo: QComboBox = None
-        self._order_combo: ForcePlot = None
-        self._annot_combo: ForcePlot = None
+        self._order_combo: QComboBox = None
+        self._annot_combo: QComboBox = None
 
         self.setup_gui()
 
@@ -530,6 +544,8 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     def _add_plot(self):
         box = gui.vBox(self.mainArea)
         self.graph = ForcePlot(self)
+        self.graph.set_show_tooltip(self.show_tooltip)
+        self.graph.set_highlight_feature(self.highlight_feature)
         self.graph.selectionChanged.connect(self.__on_selection_changed)
         box.layout().addWidget(self.graph)
 
@@ -559,6 +575,14 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         model[:] = self.ANNOTATIONS
         self._annot_combo.setModel(model)
 
+        box = gui.vBox(self.controlArea, "", margin=True,
+                       contentsMargins=(8, 4, 8, 4))
+        gui.checkBox(box, self, "show_tooltip", "Show tooltips",
+                     callback=self.__on_show_tooltip_changed)
+        gui.checkBox(box, self, "highlight_feature",
+                     "Highlight feature on hover",
+                     callback=self.__on_highlight_feature_changed)
+
         gui.rubber(self.controlArea)
 
     def __on_target_changed(self):
@@ -575,6 +599,12 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         if not self.__results or not self.data:
             return
         self._set_plot_annotations()
+
+    def __on_show_tooltip_changed(self):
+        self.graph.set_show_tooltip(self.show_tooltip)
+
+    def __on_highlight_feature_changed(self):
+        self.graph.set_highlight_feature(self.highlight_feature)
 
     def _add_buttons(self):
         plot_gui = OWPlotGUI(self)
@@ -703,7 +733,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
 
         self.graph.set_data(x_data, pos_y_data, neg_y_data,
                             pos_labels, neg_labels, x_label, y_label,
-                            self.data[self.__data_idxs])
+                            self.__results.transformed_data[self.__data_idxs])
         self._set_plot_annotations()
 
     def _set_plot_annotations(self):
