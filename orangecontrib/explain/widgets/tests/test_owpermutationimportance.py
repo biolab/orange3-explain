@@ -417,6 +417,17 @@ class TestOWPermutationImportance(WidgetTest):
         self.assertEqual(font1.pointSize(), font2.pointSize())
         self.assertEqual(font1.italic(), font2.italic())
 
+    def test_orange_version(self):
+        """
+        This test serves as a reminder.
+
+        When it starts to fail, remove it and remove the lines 18, 305 - 306 in
+        owpermutationimportance.py
+        """
+        from Orange.version import version
+
+        self.assertLess(version, "3.35.0")
+
 
 if __name__ == "__main__":
     unittest.main()
