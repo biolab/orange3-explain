@@ -67,7 +67,7 @@ class TestUtils(unittest.TestCase):
         mocked_model = Mock(wraps=model)
         baseline_score = scorer(mocked_model, data)
         mocked_model.assert_called_once()
-        self.assertAlmostEqual(baseline_score, 0.98, 3)
+        self.assertAlmostEqual(baseline_score, 0.987, 3)
 
     def test_wrap_score_predict_cls(self):
         data = self.titanic
@@ -132,7 +132,7 @@ class TestUtils(unittest.TestCase):
         - set minimum Orange version to 3.31.0
         """
         self.assertGreater(
-            "3.33.0",
+            "3.35.0",
             pkg_resources.get_distribution("orange3").version
         )
 
@@ -233,7 +233,7 @@ class TestPermutationFeatureImportance(unittest.TestCase):
         model = RandomForestLearner(random_state=0)(data)
         res = permutation_feature_importance(model, data, AUC(),
                                              self.n_repeats)
-        self.assertAlmostEqual(res[0].mean(), 0.014, 3)
+        self.assertAlmostEqual(res[0].mean(), 0.013, 3)
 
     def test_auc_orange_model(self):
         data = self.titanic

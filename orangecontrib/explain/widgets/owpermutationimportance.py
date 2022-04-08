@@ -15,6 +15,7 @@ from Orange.data import Table, DiscreteVariable, Domain, ContinuousVariable, \
     StringVariable, HasClass
 from Orange.evaluation.scoring import Score
 from Orange.regression import RandomForestRegressionLearner
+from Orange.version import version
 from Orange.widgets import gui
 from Orange.widgets.evaluate.utils import BUILTIN_SCORERS_ORDER, usable_scorers
 from Orange.widgets.settings import Setting, ContextSetting, \
@@ -295,8 +296,14 @@ class OWPermutationImportance(OWExplainFeatureBase):
                                              Optional[Type[Score]], int]:
         score = None
         if self.model:
-            var = self.model.domain.class_var
-            score = usable_scorers(var)[self.score_index]
+            if version > "3.31.1":
+                # Eventually, keep this line (remove lines 305-306) and
+                # upgrade minimal Orange version to 3.32.0.
+                # Also remove the Orange.version import
+                score = usable_scorers(self.model.domain)[self.score_index]
+            else:
+                var = self.model.domain.class_var
+                score = usable_scorers(var)[self.score_index]
         return self.data, self.model, score, self.n_repeats
 
     # Plot setup
