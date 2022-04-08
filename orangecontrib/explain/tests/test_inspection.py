@@ -132,7 +132,7 @@ class TestUtils(unittest.TestCase):
         - set minimum Orange version to 3.31.0
         """
         self.assertGreater(
-            "3.33.0",
+            "3.35.0",
             pkg_resources.get_distribution("orange3").version
         )
 
