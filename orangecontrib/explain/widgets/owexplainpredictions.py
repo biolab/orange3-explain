@@ -8,7 +8,7 @@ import numpy as np
 from AnyQt.QtCore import QPointF, Qt, Signal, QRectF, QEvent
 from AnyQt.QtGui import QTransform, QPainter, QColor, QPainterPath, \
     QPolygonF, QMouseEvent
-from AnyQt.QtWidgets import QComboBox
+from AnyQt.QtWidgets import QComboBox, QApplication, QGraphicsSceneMouseEvent
 
 import pyqtgraph as pg
 from pyqtgraph.GraphicsScene.mouseEvents import MouseClickEvent, MouseDragEvent
@@ -140,9 +140,19 @@ class ForcePlotViewBox(pg.ViewBox):
         else:
             ev.ignore()
 
+    def mousePressEvent(self, ev: QGraphicsSceneMouseEvent):
+        keys = QApplication.keyboardModifiers()
+        if self.__state == SELECT and not keys & Qt.ShiftModifier:
+            ev.accept()
+            self.sigDeselect.emit()
+        super().mousePressEvent(ev)
+
     def mouseClickEvent(self, ev: MouseClickEvent):
-        ev.accept()
-        self.sigDeselect.emit()
+        if self.__state == SELECT:
+            ev.accept()
+            self.sigDeselect.emit()
+        else:
+            super().mouseClickEvent(ev)
 
 
 class ParameterSetter(CommonParameterSetter):
