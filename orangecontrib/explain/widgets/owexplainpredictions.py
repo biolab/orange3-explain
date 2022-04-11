@@ -205,6 +205,7 @@ class ForcePlot(pg.PlotWidget):
         self.__fill_items: List[pg.FillBetweenItem] = []
         self.__text_items: List[pg.TextItem] = []
         self.__dot_items: List[pg.ScatterPlotItem] = []
+        self.__vertical_line_item: Optional[pg.InfiniteLine] = None
         self.__selection: List = []
         self.__selection_rect_items: List[SelectionRect] = []
 
@@ -302,6 +303,7 @@ class ForcePlot(pg.PlotWidget):
         self.__fill_items.clear()
         self.__text_items.clear()
         self.__dot_items.clear()
+        self.__vertical_line_item = None
         self.getViewBox().set_data_bounds(self.__data_bounds)
         self.clear()
         self._clear_selection()
@@ -401,6 +403,10 @@ class ForcePlot(pg.PlotWidget):
         px_width, px_height = view_box.viewPixelSize()
         pos = view_box.mapViewToScene(point)
         right_side = view_box.boundingRect().width() / 2 > pos.x()
+
+        self.__vertical_line_item = pg.InfiniteLine(instance_index)
+        self.addItem(self.__vertical_line_item)
+
         for rgb, labels, fill_items in ((RGB_HIGH, pos_labels, pos_fills),
                                         (RGB_LOW, neg_labels, neg_fills)):
             whiter_rgb = np.array(rgb) + (255 - np.array(rgb)) * 0.7
@@ -445,6 +451,9 @@ class ForcePlot(pg.PlotWidget):
         for item in self.__dot_items:
             self.removeItem(item)
         self.__dot_items.clear()
+        if self.__vertical_line_item is not None:
+            self.removeItem(self.__vertical_line_item)
+        self.__vertical_line_item = None
 
     def mousePressEvent(self, ev: QMouseEvent):
         self.__mouse_pressed = True
