@@ -121,9 +121,10 @@ class ForcePlotViewBox(pg.ViewBox):
                 p1, p2 = ev.buttonDownPos(), ev.pos()
                 p1, p2 = self.mapToView(p1), self.mapToView(p2)
 
-                (x1, x2), (y1, y2) = self.__data_bounds
+                (x1, x2), _ = self.__data_bounds
                 p1.setX(max(min(p1.x(), x2), x1))
                 p2.setX(max(min(p2.x(), x2), x1))
+                _, (y1, y2) = self.viewRange()
                 p1.setY(y1)
                 p2.setY(y2)
 
@@ -222,7 +223,8 @@ class ForcePlot(pg.PlotWidget):
         view_box = ForcePlotViewBox()
         view_box.sigSelectionChanged.connect(self._update_selection)
         view_box.sigDeselect.connect(self._deselect)
-        view_box.sigRangeChangedManually.connect(self.__on_range_changed)
+        view_box.sigRangeChangedManually.connect(self.__on_range_changed_man)
+        view_box.sigRangeChanged.connect(self.__on_range_changed)
 
         super().__init__(parent, viewBox=view_box,
                          background="w", enableMenu=False,
@@ -235,12 +237,26 @@ class ForcePlot(pg.PlotWidget):
 
         self.parameter_setter = ParameterSetter(self)
 
-    def __on_range_changed(self):
+    def __on_range_changed_man(self):
         scene: pg.GraphicsScene = self.getPlotItem().scene()
         if scene.lastHoverEvent is not None:
             self.__clear_tooltips()
             point = scene.lastHoverEvent.scenePos()
             self.__show_tooltip(self.getViewBox().mapSceneToView(point))
+
+    def __on_range_changed(self):
+        _, (y1, y2) = self.getViewBox().viewRange()
+        for i in range(len(self.__selection_rect_items)):
+            sel_rect_item = self.__selection_rect_items[i]
+            self.removeItem(sel_rect_item)
+
+            rect = sel_rect_item.boundingRect()
+            rect.setTop(y1)
+            rect.setBottom(y2)
+            sel_rect_item = SelectionRect(rect)
+
+            self.addItem(sel_rect_item)
+            self.__selection_rect_items[i] = sel_rect_item
 
     def __on_mouse_moved(self, point: QPointF):
         self.__clear_hover()
