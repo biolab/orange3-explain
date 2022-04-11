@@ -432,9 +432,10 @@ class ForcePlot(pg.PlotWidget):
                     self.__text_items.append(text_item)
                     self.addItem(text_item)
 
+                    dot_color = QColor(Qt.white)
                     dot_item = pg.ScatterPlotItem(
-                        x=[instance_index], y=[y_pos],
-                        size=4, brush=pg.mkBrush(QColor(Qt.black))
+                        x=[instance_index], y=[y_pos], size=6,
+                        pen=pg.mkPen(dot_color), brush=pg.mkBrush(dot_color)
                     )
                     self.__dot_items.append(dot_item)
                     self.addItem(dot_item)
