@@ -5,9 +5,10 @@ from xml.sax.saxutils import escape
 
 import numpy as np
 
-from AnyQt.QtCore import QPointF, Qt, Signal, QRectF
-from AnyQt.QtGui import QTransform, QPainter
-from AnyQt.QtWidgets import QToolTip, QGraphicsSceneHelpEvent, QComboBox
+from AnyQt.QtCore import QPointF, Qt, Signal, QRectF, QEvent
+from AnyQt.QtGui import QTransform, QPainter, QColor, QPainterPath, \
+    QPolygonF, QMouseEvent
+from AnyQt.QtWidgets import QComboBox, QApplication, QGraphicsSceneMouseEvent
 
 import pyqtgraph as pg
 from pyqtgraph.GraphicsScene.mouseEvents import MouseClickEvent, MouseDragEvent
@@ -16,7 +17,7 @@ from orangewidget.utils.visual_settings_dlg import VisualSettingsDialog
 
 from Orange.base import Model
 from Orange.data import Table, Domain, ContinuousVariable, Variable
-from Orange.data.table import DomainTransformationError, RowInstance
+from Orange.data.table import DomainTransformationError
 from Orange.widgets import gui
 from Orange.widgets.settings import ContextSetting, Setting, \
     PerfectDomainContextHandler
@@ -29,8 +30,7 @@ from Orange.widgets.utils.sql import check_sql_input
 from Orange.widgets.utils.widgetpreview import WidgetPreview
 from Orange.widgets.visualize.utils.customizableplot import \
     CommonParameterSetter
-from Orange.widgets.visualize.utils.plotutils import HelpEventDelegate, \
-    AxisItem
+from Orange.widgets.visualize.utils.plotutils import AxisItem
 from Orange.widgets.widget import Input, Output, OWWidget, Msg
 
 from orangecontrib.explain.explainer import explain_predictions, \
@@ -121,9 +121,10 @@ class ForcePlotViewBox(pg.ViewBox):
                 p1, p2 = ev.buttonDownPos(), ev.pos()
                 p1, p2 = self.mapToView(p1), self.mapToView(p2)
 
-                (x1, x2), (y1, y2) = self.__data_bounds
+                (x1, x2), _ = self.__data_bounds
                 p1.setX(max(min(p1.x(), x2), x1))
                 p2.setX(max(min(p2.x(), x2), x1))
+                _, (y1, y2) = self.viewRange()
                 p1.setY(y1)
                 p2.setY(y2)
 
@@ -140,9 +141,19 @@ class ForcePlotViewBox(pg.ViewBox):
         else:
             ev.ignore()
 
+    def mousePressEvent(self, ev: QGraphicsSceneMouseEvent):
+        keys = QApplication.keyboardModifiers()
+        if self.__state == SELECT and not keys & Qt.ShiftModifier:
+            ev.accept()
+            self.sigDeselect.emit()
+        super().mousePressEvent(ev)
+
     def mouseClickEvent(self, ev: MouseClickEvent):
-        ev.accept()
-        self.sigDeselect.emit()
+        if self.__state == SELECT:
+            ev.accept()
+            self.sigDeselect.emit()
+        else:
+            super().mouseClickEvent(ev)
 
 
 class ParameterSetter(CommonParameterSetter):
@@ -157,6 +168,7 @@ class ParameterSetter(CommonParameterSetter):
         self.initial_settings = {
             self.LABELS_BOX: {
                 self.FONT_FAMILY_LABEL: self.FONT_FAMILY_SETTING,
+                self.AXIS_TITLE_LABEL: self.FONT_SETTING,
                 self.AXIS_TICKS_LABEL: self.FONT_SETTING,
             },
             self.PLOT_BOX: {
@@ -178,20 +190,41 @@ class ParameterSetter(CommonParameterSetter):
                 self.master.getPlotItem().axes.values()]
 
 
+class FillBetweenItem(pg.FillBetweenItem):
+    def __init__(self, rgb: List[int], *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__rgb = rgb
+
+    @property
+    def rgb(self) -> List[int]:
+        return self.__rgb
+
+
 class ForcePlot(pg.PlotWidget):
     selectionChanged = Signal(list)
 
     def __init__(self, parent: OWWidget):
         self.__data_bounds: Optional[Tuple[Tuple[float, float],
                                            Tuple[float, float]]] = None
+        self.__pos_labels: Optional[List[str]] = None
+        self.__neg_labels: Optional[List[str]] = None
         self.__tooltip_data: Optional[Table] = None
+        self.__show_tooltips = True
+        self.__highlight_feature = True
+        self.__mouse_pressed = False
 
+        self.__fill_items: List[pg.FillBetweenItem] = []
+        self.__text_items: List[pg.TextItem] = []
+        self.__dot_items: List[pg.ScatterPlotItem] = []
+        self.__vertical_line_item: Optional[pg.InfiniteLine] = None
         self.__selection: List = []
         self.__selection_rect_items: List[SelectionRect] = []
 
         view_box = ForcePlotViewBox()
         view_box.sigSelectionChanged.connect(self._update_selection)
         view_box.sigDeselect.connect(self._deselect)
+        view_box.sigRangeChangedManually.connect(self.__on_range_changed_man)
+        view_box.sigRangeChanged.connect(self.__on_range_changed)
 
         super().__init__(parent, viewBox=view_box,
                          background="w", enableMenu=False,
@@ -200,23 +233,60 @@ class ForcePlot(pg.PlotWidget):
         self.setAntialiasing(True)
         self.getPlotItem().setContentsMargins(10, 10, 10, 10)
         self.getPlotItem().buttonsHidden = True
-
-        self._tooltip_delegate = HelpEventDelegate(self.help_event)
-        self.scene().installEventFilter(self._tooltip_delegate)
+        self.getPlotItem().scene().sigMouseMoved.connect(self.__on_mouse_moved)
 
         self.parameter_setter = ParameterSetter(self)
+
+    def __on_range_changed_man(self):
+        scene: pg.GraphicsScene = self.getPlotItem().scene()
+        if scene.lastHoverEvent is not None:
+            self.__clear_tooltips()
+            point = scene.lastHoverEvent.scenePos()
+            self.__show_tooltip(self.getViewBox().mapSceneToView(point))
+
+    def __on_range_changed(self):
+        _, (y1, y2) = self.getViewBox().viewRange()
+        for i in range(len(self.__selection_rect_items)):
+            sel_rect_item = self.__selection_rect_items[i]
+            self.removeItem(sel_rect_item)
+
+            rect = sel_rect_item.boundingRect()
+            rect.setTop(y1)
+            rect.setBottom(y2)
+            sel_rect_item = SelectionRect(rect)
+
+            self.addItem(sel_rect_item)
+            self.__selection_rect_items[i] = sel_rect_item
+
+    def __on_mouse_moved(self, point: QPointF):
+        self.__clear_hover()
+
+        view_box: ForcePlotViewBox = self.getViewBox()
+        view_pos: QPointF = view_box.mapSceneToView(point)
+        (xmin, xmax), (ymin, ymax) = view_box.viewRange()
+        in_view = xmin <= view_pos.x() <= xmax and ymin <= view_pos.y() <= ymax
+        if not in_view or self.__mouse_pressed:
+            return
+
+        self.__hightlight(view_pos)
+        self.__show_tooltip(view_pos)
 
     def set_data(self, x_data: np.ndarray,
                  pos_y_data: List[Tuple[np.ndarray, np.ndarray]],
                  neg_y_data: List[Tuple[np.ndarray, np.ndarray]],
+                 pos_labels: List[str], neg_labels: List[str],
+                 x_label: str, y_label: str,
                  tooltip_data: Table):
 
         self.__data_bounds = ((np.nanmin(x_data), np.nanmax(x_data)),
                               (np.nanmin(pos_y_data), np.nanmax(neg_y_data)))
+        self.__pos_labels = pos_labels
+        self.__neg_labels = neg_labels
         self.__tooltip_data = tooltip_data
 
         self.getViewBox().set_data_bounds(self.__data_bounds)
         self._set_range()
+        self._set_axes(x_label, y_label)
         self._plot_data(x_data, pos_y_data, neg_y_data)
 
     def _plot_data(self, x_data: np.ndarray,
@@ -227,22 +297,43 @@ class ForcePlot(pg.PlotWidget):
             pen = pg.mkPen(whiter_rgb, width=1)
             brush = pg.mkBrush(rgb)
             for y_top, y_bottom in data:
-                fill = pg.FillBetweenItem(
-                    pg.PlotDataItem(x=x_data, y=y_bottom),
+                fill = FillBetweenItem(
+                    rgb, pg.PlotDataItem(x=x_data, y=y_bottom),
                     pg.PlotDataItem(x=x_data, y=y_top), pen=pen, brush=brush
                 )
+                self.__fill_items.append(fill)
                 self.addItem(fill)
+
+    def _set_axes(self, x_label: str, y_label: str):
+        bottom_axis: AxisItem = self.getAxis("bottom")
+        bottom_axis.setLabel(x_label)
+        bottom_axis.resizeEvent(None)
+
+        left_axis: AxisItem = self.getAxis("left")
+        left_axis.setLabel(y_label)
+        left_axis.resizeEvent(None)
 
     def set_axis(self, ticks: Optional[List]):
         ax: AxisItem = self.getAxis("bottom")
         ax.setTicks(ticks)
 
+    def set_show_tooltip(self, show: bool):
+        self.__show_tooltips = show
+
+    def set_highlight_feature(self, highlight: bool):
+        self.__highlight_feature = highlight
+
     def clear_all(self):
         self.__data_bounds = None
         self.__tooltip_data = None
+        self.__fill_items.clear()
+        self.__text_items.clear()
+        self.__dot_items.clear()
+        self.__vertical_line_item = None
         self.getViewBox().set_data_bounds(self.__data_bounds)
         self.clear()
         self._clear_selection()
+        self._set_axes(None, None)
 
     def _clear_selection(self):
         self.__selection = []
@@ -298,40 +389,124 @@ class ForcePlot(pg.PlotWidget):
         view_box.setXRange(*x_range, padding=0)
         view_box.setYRange(*y_range, padding=0.1)
 
-    def help_event(self, event: QGraphicsSceneHelpEvent) -> bool:
-        if self.__tooltip_data is None:
-            return False
+    def __hightlight(self, point: QPointF):
+        if not self.__highlight_feature:
+            return
+        for index, item in enumerate(self.__fill_items):
+            if self._contains_point(item, point):
+                n = len(self.__neg_labels)
+                if index < n:
+                    name = self.__pos_labels[index]
+                    index_other = self.__neg_labels.index(name) + n
+                else:
+                    name = self.__neg_labels[index - n]
+                    index_other = self.__pos_labels.index(name)
 
-        point: QPointF = self.getViewBox().mapSceneToView(event.scenePos())
-        index = int(round(point.x(), 0))
+                for i in (index, index_other):
+                    item = self.__fill_items[i]
+                    color = QColor(*item.rgb)
+                    color = color.darker(120)
+                    item.setBrush(pg.mkBrush(color))
 
-        if 0 <= index < len(self.__tooltip_data):
-            text = self._instance_tooltip(self.__tooltip_data.domain,
-                                          self.__tooltip_data[index])
-            QToolTip.showText(event.screenPos(), text, widget=self)
-            return True
-        return False
+                break
+
+    def __show_tooltip(self, point: QPointF):
+        if not self.__show_tooltips:
+            return
+        instance_index = int(round(point.x(), 0))
+        if self.__tooltip_data is None or instance_index < 0 or \
+                instance_index >= len(self.__tooltip_data):
+            return
+
+        instance = self.__tooltip_data[instance_index]
+        n_features = len(self.__fill_items) // 2
+        pos_fills = self.__fill_items[:n_features]
+        neg_fills = self.__fill_items[n_features:]
+        pos_labels = self.__pos_labels
+        neg_labels = self.__neg_labels
+
+        view_box: ForcePlotViewBox = self.getViewBox()
+        px_width, px_height = view_box.viewPixelSize()
+        pos = view_box.mapViewToScene(point)
+        right_side = view_box.boundingRect().width() / 2 > pos.x()
+
+        self.__vertical_line_item = pg.InfiniteLine(instance_index)
+        self.addItem(self.__vertical_line_item)
+
+        for rgb, labels, fill_items in ((RGB_HIGH, pos_labels, pos_fills),
+                                        (RGB_LOW, neg_labels, neg_fills)):
+            whiter_rgb = np.array(rgb) + (255 - np.array(rgb)) * 0.7
+            for i, (label, fill_item) in enumerate(zip(labels, fill_items)):
+                curve1, curve2 = fill_item.curves
+                y_lower = curve1.curve.getData()[1][instance_index]
+                y_upper = curve2.curve.getData()[1][instance_index]
+                delta_y = y_upper - y_lower
+                text_item = pg.TextItem(
+                    text=escape(f"{label} = {instance[label]}"),
+                    color=rgb, fill=pg.mkBrush(whiter_rgb)
+                )
+                height = text_item.boundingRect().height() * px_height * 2
+                if height < delta_y or self._contains_point(fill_item, point):
+                    if right_side:
+                        x_pos = instance_index + px_width * 5
+                    else:
+                        x_pos = instance_index - px_width * 5
+                        x_pos -= px_width * text_item.boundingRect().width()
+                    y_pos = y_upper - delta_y / 2
+
+                    text_item.setPos(x_pos, y_pos)
+                    self.__text_items.append(text_item)
+                    self.addItem(text_item)
+
+                    dot_color = QColor(Qt.white)
+                    dot_item = pg.ScatterPlotItem(
+                        x=[instance_index], y=[y_pos], size=6,
+                        pen=pg.mkPen(dot_color), brush=pg.mkBrush(dot_color)
+                    )
+                    self.__dot_items.append(dot_item)
+                    self.addItem(dot_item)
+
+    def __clear_hover(self):
+        for item in self.__fill_items:
+            item.setBrush(pg.mkBrush(*item.rgb))
+        self.__clear_tooltips()
+
+    def __clear_tooltips(self):
+        for item in self.__text_items:
+            self.removeItem(item)
+        self.__text_items.clear()
+        for item in self.__dot_items:
+            self.removeItem(item)
+        self.__dot_items.clear()
+        if self.__vertical_line_item is not None:
+            self.removeItem(self.__vertical_line_item)
+        self.__vertical_line_item = None
+
+    def mousePressEvent(self, ev: QMouseEvent):
+        self.__mouse_pressed = True
+        self.__clear_hover()
+        super().mousePressEvent(ev)
+
+    def mouseReleaseEvent(self, ev: QMouseEvent):
+        super().mouseReleaseEvent(ev)
+        self.__mouse_pressed = False
+
+    def leaveEvent(self, ev: QEvent):
+        super().leaveEvent(ev)
+        self.__clear_hover()
 
     @staticmethod
-    def _instance_tooltip(domain: Domain, instance: RowInstance) -> str:
-        def show_part(singular, plural, max_shown, variables):
-            cols = [escape(f"{var.name} = {instance[var]}")
-                    for var in variables[:max_shown + 2]][:max_shown]
-            if not cols:
-                return ""
-
-            n_vars = len(variables)
-            if n_vars > max_shown:
-                cols[-1] = f"... and {n_vars - max_shown + 1} others"
-
-            tag = singular if n_vars < 2 else plural
-            return f"<b>{tag}</b>:<br/>" + "<br/>".join(cols)
-
-        parts = (("Class", "Classes", 4, domain.class_vars),
-                 ("Meta", "Metas", 4, domain.metas),
-                 ("Feature", "Features", 10, domain.attributes))
-
-        return "<br/>".join(show_part(*columns) for columns in parts)
+    def _contains_point(item: pg.FillBetweenItem, point: QPointF) -> bool:
+        curve1, curve2 = item.curves
+        x_data_lower, y_data_lower = curve1.curve.getData()
+        x_data_upper, y_data_upper = curve2.curve.getData()
+        pts = [QPointF(x, y) for x, y in zip(x_data_lower, y_data_lower)]
+        pts += [QPointF(x, y) for x, y in
+                reversed(list(zip(x_data_upper, y_data_upper)))]
+        pts += pts[:1]
+        path = QPainterPath()
+        path.addPolygon(QPolygonF(pts))
+        return path.contains(point)
 
 
 class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
@@ -365,6 +540,8 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     target_index = ContextSetting(0)
     order_index = ContextSetting(0)
     annot_index = ContextSetting(0)
+    show_tooltip = Setting(True)
+    highlight_feature = Setting(True)
     selection_ranges = Setting([], schema_only=True)
     auto_send = Setting(True)
     visual_settings = Setting({}, schema_only=True)
@@ -387,8 +564,8 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
 
         self.graph: ForcePlot = None
         self._target_combo: QComboBox = None
-        self._order_combo: ForcePlot = None
-        self._annot_combo: ForcePlot = None
+        self._order_combo: QComboBox = None
+        self._annot_combo: QComboBox = None
 
         self.setup_gui()
 
@@ -403,6 +580,8 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     def _add_plot(self):
         box = gui.vBox(self.mainArea)
         self.graph = ForcePlot(self)
+        self.graph.set_show_tooltip(self.show_tooltip)
+        self.graph.set_highlight_feature(self.highlight_feature)
         self.graph.selectionChanged.connect(self.__on_selection_changed)
         box.layout().addWidget(self.graph)
 
@@ -432,6 +611,14 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         model[:] = self.ANNOTATIONS
         self._annot_combo.setModel(model)
 
+        box = gui.vBox(self.controlArea, "", margin=True,
+                       contentsMargins=(8, 4, 8, 4))
+        gui.checkBox(box, self, "show_tooltip", "Show tooltips",
+                     callback=self.__on_show_tooltip_changed)
+        gui.checkBox(box, self, "highlight_feature",
+                     "Highlight feature on hover",
+                     callback=self.__on_highlight_feature_changed)
+
         gui.rubber(self.controlArea)
 
     def __on_target_changed(self):
@@ -448,6 +635,12 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         if not self.__results or not self.data:
             return
         self._set_plot_annotations()
+
+    def __on_show_tooltip_changed(self):
+        self.graph.set_show_tooltip(self.show_tooltip)
+
+    def __on_highlight_feature_changed(self):
+        self.graph.set_highlight_feature(self.highlight_feature)
 
     def _add_buttons(self):
         plot_gui = OWPlotGUI(self)
@@ -543,24 +736,40 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
         if not self.__results or not self.data:
             return
 
+        order = self._order_combo.model()[self.order_index]
         values_idxs = get_instance_ordering(
             self.__results.values[self.target_index],
             self.__results.predictions[self.__results.mask, self.target_index],
             self.data[self.__results.mask],
-            self._order_combo.model()[self.order_index]
+            order
         )
 
         data_idxs = np.arange(len(self.data))
         self.__data_idxs = data_idxs[self.__results.mask][values_idxs]
 
-        x_data, pos_y_data, neg_y_data = \
+        x_data, pos_y_data, neg_y_data, pos_labels, neg_labels = \
             prepare_force_plot_data_multi_inst(
                 self.__results.values[self.target_index][values_idxs],
-                self.__results.base_value[self.target_index]
+                self.__results.base_value[self.target_index],
+                self.model.domain
             )
 
+        if self.order_index == 0:
+            order = "hierarhical clustering"
+        elif self.order_index == 1:
+            order = "output value"
+        elif self.order_index == 2:
+            order = "original ordering"
+        x_label = f"Instances ordered by {order}"
+
+        target = self.model.domain.class_var
+        if self.model.domain.has_discrete_class:
+            target = f"{target} = {target.values[self.target_index]}"
+        y_label = f"Output value ({target})"
+
         self.graph.set_data(x_data, pos_y_data, neg_y_data,
-                            self.data[self.__data_idxs])
+                            pos_labels, neg_labels, x_label, y_label,
+                            self.__results.transformed_data[self.__data_idxs])
         self._set_plot_annotations()
 
     def _set_plot_annotations(self):
