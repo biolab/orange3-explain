@@ -7,7 +7,7 @@ from setuptools import setup, find_packages
 
 NAME = "Orange3-Explain"
 
-VERSION = "0.5.2"
+VERSION = "0.5.3"
 
 AUTHOR = "Bioinformatics Laboratory, FRI UL"
 AUTHOR_EMAIL = "contact@orange.biolab.si"
