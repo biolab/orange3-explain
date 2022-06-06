@@ -3,19 +3,19 @@ from unittest.mock import Mock
 import pkg_resources
 
 import numpy as np
-from sklearn.inspection import permutation_importance
+from sklearn.inspection import permutation_importance, partial_dependence
 
 from Orange.base import Model
 from Orange.classification import NaiveBayesLearner, RandomForestLearner, \
     LogisticRegressionLearner, TreeLearner
-from Orange.data import Table, Domain
+from Orange.data import Table, Domain, DiscreteVariable
 from Orange.data.table import DomainTransformationError
 from Orange.evaluation import CA, MSE, AUC
 from Orange.regression import RandomForestRegressionLearner, \
     TreeLearner as TreeRegressionLearner
 
 from orangecontrib.explain.inspection import permutation_feature_importance, \
-    _wrap_score, _check_model
+    _wrap_score, _check_model, individual_condition_expectation
 
 
 def _permutation_feature_importance_skl(
@@ -282,6 +282,102 @@ class TestPermutationFeatureImportance(unittest.TestCase):
         self.assertEqual(
             res[1], [a.name for a in sparse_data.domain.attributes]
         )
+
+
+class TestIndividualConditionalExpectation(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.iris = Table.from_file("iris")
+        cls.heart = Table.from_file("heart_disease")
+        cls.housing = Table.from_file("housing")
+
+    def test_discrete_class(self):
+        data = self.iris[:100]
+        class_var = DiscreteVariable("iris", data.domain.class_var.values[:2])
+        data = data.transform(Domain(data.domain.attributes, class_var))
+        model = RandomForestLearner(n_estimators=10, random_state=0)(data)
+        res = individual_condition_expectation(model, data, data.domain[0])
+        self.assertIsInstance(res, dict)
+        self.assertEqual(res["average"].shape, (2, 28))
+        self.assertEqual(res["individual"].shape, (2, 100, 28))
+        self.assertEqual(res["values"].shape, (28,))
+
+    def test_discrete_class_result_values(self):
+        data = self.iris[:100]
+        class_var = DiscreteVariable("iris", data.domain.class_var.values[:2])
+        data = data.transform(Domain(data.domain.attributes, class_var))
+        model1 = RandomForestLearner(n_estimators=10, random_state=0)(data)
+
+        data.Y = np.abs(data.Y - 1)
+        model2 = RandomForestLearner(n_estimators=10, random_state=0)(data)
+
+        res = individual_condition_expectation(model1, data, data.domain[0])
+        dep1 = partial_dependence(model1.skl_model, data.X, [0], kind="both")
+        dep2 = partial_dependence(model2.skl_model, data.X, [0], kind="both")
+        np.testing.assert_array_almost_equal(
+            res["average"][:1], dep2["average"])
+        np.testing.assert_array_almost_equal(
+            res["average"][1:], dep1["average"])
+        np.testing.assert_array_almost_equal(
+            res["individual"][:1], dep2["individual"])
+        np.testing.assert_array_almost_equal(
+            res["individual"][1:], dep1["individual"])
+
+    def test_continuous_class(self):
+        data = self.housing
+        model = RandomForestRegressionLearner(n_estimators=10, random_state=0)(data)
+        res = individual_condition_expectation(model, data, data.domain[0])
+        self.assertIsInstance(res, dict)
+        self.assertEqual(res["average"].shape, (1, 504))
+        self.assertEqual(res["individual"].shape, (1, 506, 504))
+        self.assertEqual(res["values"].shape, (504,))
+
+    def test_multi_class(self):
+        data = self.iris
+        model = RandomForestLearner(n_estimators=10, random_state=0)(data)
+        res = individual_condition_expectation(model, data, data.domain[0])
+        self.assertIsInstance(res, dict)
+        self.assertEqual(res["average"].shape, (3, 35))
+        self.assertEqual(res["individual"].shape, (3, 150, 35))
+        self.assertEqual(res["values"].shape, (35,))
+
+    def test_mixed_features(self):
+        data = self.heart
+        model = RandomForestLearner(n_estimators=10, random_state=0)(data)
+        res = individual_condition_expectation(model, data, data.domain[0])
+        self.assertIsInstance(res, dict)
+        self.assertEqual(res["average"].shape, (2, 41))
+        self.assertEqual(res["individual"].shape, (2, 303, 41))
+        self.assertEqual(res["values"].shape, (41,))
+
+    def _test_sklearn(self):
+        from matplotlib import pyplot as plt
+        from sklearn.ensemble import RandomForestClassifier, \
+            RandomForestRegressor
+        from sklearn.inspection import PartialDependenceDisplay
+
+        X = self.housing.X
+        y = self.housing.Y
+        model = RandomForestRegressor(random_state=0)
+
+        # X = self.iris.X[:100]
+        # y = self.iris.Y[:100]
+        # y = np.abs(y - 1)
+        # model = RandomForestClassifier(random_state=0)
+        model.fit(X, y)
+        display = PartialDependenceDisplay.from_estimator(
+            model,
+            X,
+            [X.shape[1] - 1],
+            target=0,
+            kind="both",
+            centered=True,
+            subsample=1000,
+            # grid_resolution=100,
+            random_state=0,
+        )
+
+        plt.show()
 
 
 if __name__ == "__main__":
