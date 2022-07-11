@@ -1,6 +1,6 @@
 import bisect
 from types import SimpleNamespace
-from typing import Optional, Dict, List, Tuple
+from typing import Optional, Dict, List, Tuple, Any
 from xml.sax.saxutils import escape
 
 import numpy as np
@@ -27,11 +27,14 @@ from Orange.widgets.utils.itemmodels import VariableListModel, DomainModel
 from Orange.widgets.utils.sql import check_sql_input
 from Orange.widgets.utils.widgetpreview import WidgetPreview
 from Orange.widgets.visualize.owdistributions import LegendItem
+from Orange.widgets.visualize.utils.customizableplot import Updater, \
+    CommonParameterSetter
 from Orange.widgets.visualize.utils.plotutils import PlotWidget, \
     HelpEventDelegate
 from Orange.widgets.widget import Input, OWWidget, Msg
 
 from orangecontrib.explain.inspection import individual_condition_expectation
+from orangewidget.utils.visual_settings_dlg import VisualSettingsDialog
 
 
 class RunnerResults(SimpleNamespace):
@@ -72,6 +75,39 @@ class SortProxyModel(QSortFilterProxyModel):
         return r_score is not None and (l_score is None or l_score < r_score)
 
 
+class ParameterSetter(CommonParameterSetter):
+    def __init__(self, master: "ICEPlot"):
+        super().__init__()
+        self.master: ICEPlot = master
+
+    def update_setters(self):
+        self.initial_settings = {
+            self.LABELS_BOX: {
+                self.FONT_FAMILY_LABEL: self.FONT_FAMILY_SETTING,
+                self.TITLE_LABEL: self.FONT_SETTING,
+                self.AXIS_TITLE_LABEL: self.FONT_SETTING,
+                self.AXIS_TICKS_LABEL: self.FONT_SETTING,
+                self.LEGEND_LABEL: self.FONT_SETTING,
+            },
+            self.ANNOT_BOX: {
+                self.TITLE_LABEL: {self.TITLE_LABEL: ("", "")},
+            },
+        }
+
+    @property
+    def title_item(self):
+        return self.master.getPlotItem().titleLabel
+
+    @property
+    def axis_items(self):
+        return [value["item"] for value in
+                self.master.getPlotItem().axes.values()]
+
+    @property
+    def legend_items(self):
+        return self.master.legend.items
+
+
 class ICEPlot(PlotWidget):
     DEFAULT_COLOR = np.array([100, 100, 100])
     MAX_POINTS_IN_TOOLTIP = 5
@@ -96,6 +132,8 @@ class ICEPlot(PlotWidget):
 
         self._help_delegate = HelpEventDelegate(self._help_event)
         self.scene().installEventFilter(self._help_delegate)
+
+        self.parameter_setter = ParameterSetter(self)
 
     def _create_legend(self, anchor: Tuple) -> LegendItem:
         legend = LegendItem()
@@ -170,6 +208,8 @@ class ICEPlot(PlotWidget):
                 dots = pg.ScatterPlotItem(pen=c, brush=c, size=10, shape="s")
                 self.legend.addItem(dots, escape(name))
             self.legend.show()
+        Updater.update_legend_font(self.parameter_setter.legend_items,
+                                   **self.parameter_setter.legend_settings)
 
     def _set_axes(self, x_label: str, y_label: str):
         self.getAxis("bottom").setLabel(x_label)
@@ -353,6 +393,7 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
     centered = Setting(True)
     show_mean = Setting(True)
     # auto_send = Setting(True)
+    visual_settings = Setting({}, schema_only=True)
 
     graph_name = "graph.plotItem"
     MIN_INSTANCES = 2
@@ -373,6 +414,8 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
         self._color_model: DomainModel = None
 
         self.setup_gui()
+
+        VisualSettingsDialog(self, self.graph.parameter_setter.initial_settings)
 
     def setup_gui(self):
         self._add_plot()
@@ -623,6 +666,10 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
             items["Target class"] = class_var.values[self.target_index]
         self.report_items(items)
         self.report_plot()
+
+    def set_visual_settings(self, key: Tuple[str, str, str], value: Any):
+        self.graph.parameter_setter.set_parameter(key, value)
+        self.visual_settings[key] = value
 
 
 if __name__ == "__main__":
