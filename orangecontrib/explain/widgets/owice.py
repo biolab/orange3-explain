@@ -1,6 +1,6 @@
 import bisect
 from types import SimpleNamespace
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Tuple
 from xml.sax.saxutils import escape
 
 import numpy as np
@@ -26,6 +26,7 @@ from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
 from Orange.widgets.utils.itemmodels import VariableListModel, DomainModel
 from Orange.widgets.utils.sql import check_sql_input
 from Orange.widgets.utils.widgetpreview import WidgetPreview
+from Orange.widgets.visualize.owdistributions import LegendItem
 from Orange.widgets.visualize.utils.plotutils import PlotWidget, \
     HelpEventDelegate
 from Orange.widgets.widget import Input, OWWidget, Msg
@@ -77,6 +78,7 @@ class ICEPlot(PlotWidget):
 
     def __init__(self, parent: OWWidget):
         super().__init__(parent, enableMenu=False)
+        self.legend = self._create_legend(((1, 0), (1, 0)))
         self.setAntialiasing(True)
         self.setMouseEnabled(False, False)
         self.getPlotItem().setContentsMargins(10, 10, 10, 10)
@@ -94,6 +96,13 @@ class ICEPlot(PlotWidget):
 
         self._help_delegate = HelpEventDelegate(self._help_event)
         self.scene().installEventFilter(self._help_delegate)
+
+    def _create_legend(self, anchor: Tuple) -> LegendItem:
+        legend = LegendItem()
+        legend.setParentItem(self.getViewBox())
+        legend.restoreAnchor(anchor)
+        legend.hide()
+        return legend
 
     def __on_mouse_moved(self, point: QPointF):
         if self.__hovered_lines_item is None:
@@ -141,6 +150,7 @@ class ICEPlot(PlotWidget):
             y_label: str,
             colors: Optional[np.ndarray],
             color_col: Optional[np.ndarray],
+            color_labels: Optional[Tuple[str, str, str]],
             show_mean: bool,
     ):
         self.__data = data
@@ -149,6 +159,17 @@ class ICEPlot(PlotWidget):
         self.__y_individual = y_individual
         self._add_lines(y_average, show_mean, colors, color_col)
         self._set_axes(feature.name, y_label)
+        self._set_legend(color_labels, colors)
+
+    def _set_legend(self, labels: Optional[Tuple], colors: Optional[np.ndarray]):
+        self.legend.clear()
+        self.legend.hide()
+        if labels is not None:
+            for name, color in zip(labels, colors):
+                c = QColor(*color)
+                dots = pg.ScatterPlotItem(pen=c, brush=c, size=10, shape="s")
+                self.legend.addItem(dots, escape(name))
+            self.legend.show()
 
     def _set_axes(self, x_label: str, y_label: str):
         self.getAxis("bottom").setLabel(x_label)
@@ -226,6 +247,7 @@ class ICEPlot(PlotWidget):
             self.removeItem(self.__hovered_scatter_item)
             self.__hovered_scatter_item = None
         self.clear()
+        self.legend.hide()
         self._set_axes(None, None)
 
     def __add_curve_item(self, x_data, y_data, color):
@@ -564,14 +586,16 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
 
         colors = None
         color_col = None
+        color_labels = None
         if self.color_var and self.color_var.is_discrete:
             colors = self.color_var.colors
             color_col = self.data.get_column_view(self.color_var)[0]
+            color_labels = self.color_var.values
 
         self.graph.set_data(self.data, self.feature,
                             x_data, y_average, y_individual,
-                            f"Predicted {class_var.name}{postfix}",
-                            colors, color_col, self.show_mean)
+                            f"Predicted {class_var.name}{postfix}", colors,
+                            color_col, color_labels, self.show_mean)
 
     def on_partial_result(self, _):
         pass
