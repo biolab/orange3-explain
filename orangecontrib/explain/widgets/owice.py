@@ -438,10 +438,10 @@ class ICEPlot(PlotWidget):
         else:
             y = self.__y_individual[:, -1]
 
-        # TODO - eps depends on pixel-view ratio
-        eps = (np.nanmax(self.__y_individual) -
-               np.nanmin(self.__y_individual)) / 1000
-        mask = np.abs(y - pos.y()) < eps
+        # eps is pixel size dependent
+        vb: ICEPlotViewBox = self.getViewBox()
+        _, px_height = vb.viewPixelSize()
+        mask = np.abs(y - pos.y()) < px_height * 5  # 5 px
         return np.flatnonzero(mask).tolist()
 
     def _help_event(self, event: QGraphicsSceneHelpEvent):
