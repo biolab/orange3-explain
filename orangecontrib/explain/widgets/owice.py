@@ -5,10 +5,10 @@ from xml.sax.saxutils import escape
 
 import numpy as np
 from AnyQt.QtCore import Qt, QSortFilterProxyModel, QSize, QModelIndex, \
-    QItemSelection, QPointF
+    QItemSelection, QPointF, Signal, QLineF
 from AnyQt.QtGui import QColor
 from AnyQt.QtWidgets import QComboBox, QSizePolicy, QGraphicsSceneHelpEvent, \
-    QToolTip
+    QToolTip, QGraphicsLineItem, QApplication
 
 import pyqtgraph as pg
 
@@ -22,6 +22,8 @@ from Orange.data.table import DomainTransformationError
 from Orange.widgets import gui
 from Orange.widgets.settings import ContextSetting, Setting, \
     PerfectDomainContextHandler
+from Orange.widgets.utils.annotated_data import ANNOTATED_DATA_SIGNAL_NAME, \
+    create_annotated_table
 from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
 from Orange.widgets.utils.itemmodels import VariableListModel, DomainModel
 from Orange.widgets.utils.sql import check_sql_input
@@ -31,7 +33,7 @@ from Orange.widgets.visualize.utils.customizableplot import Updater, \
     CommonParameterSetter
 from Orange.widgets.visualize.utils.plotutils import PlotWidget, \
     HelpEventDelegate
-from Orange.widgets.widget import Input, OWWidget, Msg
+from Orange.widgets.widget import Input, OWWidget, Msg, Output
 
 from orangecontrib.explain.inspection import individual_condition_expectation
 from orangewidget.utils.visual_settings_dlg import VisualSettingsDialog
@@ -65,6 +67,96 @@ def run(
     return RunnerResults(x_data=result["values"],
                          y_average=result["average"],
                          y_individual=result["individual"])
+
+
+def ccw(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> np.ndarray:
+    """
+    Checks whether three points are listed in a counterclockwise order.
+    """
+    ax, ay = (a[:, 0], a[:, 1]) if a.ndim == 2 else (a[0], a[1])
+    bx, by = (b[:, 0], b[:, 1]) if b.ndim == 2 else (b[0], b[1])
+    cx, cy = (c[:, 0], c[:, 1]) if c.ndim == 2 else (c[0], c[1])
+    return (cy - ay) * (bx - ax) > (by - ay) * (cx - ax)
+
+
+def intersects(
+        a: np.ndarray,
+        b: np.ndarray,
+        c: np.ndarray,
+        d: np.ndarray
+) -> np.ndarray:
+    """
+    Checks whether line segment a (given points a and b) intersects with line
+    segment b (given points c and d).
+    """
+    return np.logical_and(ccw(a, c, d) != ccw(b, c, d),
+                          ccw(a, b, c) != ccw(a, b, d))
+
+
+def line_intersects_profiles(
+        p1: np.ndarray,
+        p2: np.ndarray,
+        lines: np.ndarray
+) -> np.ndarray:
+    """
+    Checks if a line intersects any line segments.
+    """
+    res = np.zeros(len(lines[0]), dtype=bool)
+    for i in range(len(lines) - 1):
+        res = np.logical_or(res, intersects(p1, p2, lines[i], lines[i + 1]))
+    return res
+
+
+class ICEPlotViewBox(pg.ViewBox):
+    sigSelectionChanged = Signal(object)
+
+    def __init__(self):
+        super().__init__(enableMenu=False)
+        self.__lines = None
+        self.__selection_line = QGraphicsLineItem()
+        self.__selection_line.setPen(pg.mkPen(QColor(Qt.black), width=2))
+        self.__selection_line.setZValue(1e9)
+        self.addItem(self.__selection_line, ignoreBounds=True)
+
+    def __update_selection_line(self, button_down_pos, current_pos):
+        p1 = self.childGroup.mapFromParent(button_down_pos)
+        p2 = self.childGroup.mapFromParent(current_pos)
+        self.__selection_line.setLine(QLineF(p1, p2))
+        self.__selection_line.resetTransform()
+        self.__selection_line.show()
+
+    def __get_selected(self, p1, p2):
+        if self.__lines is None:
+            return np.array(False)
+        return line_intersects_profiles(np.array([p1.x(), p1.y()]),
+                                        np.array([p2.x(), p2.y()]),
+                                        self.__lines)
+
+    def set_lines(self, x_data: np.ndarray, y_data: np.ndarray):
+        if x_data is None or y_data is None:
+            self.__lines = None
+            return
+        self.__lines = np.array([np.vstack((np.full((1, y_data.shape[0]), x),
+                                            y_data[:, i].flatten())).T
+                                 for i, x in enumerate(x_data)])
+
+    def mouseDragEvent(self, ev, axis=None):
+        if axis is None:
+            ev.accept()
+            if ev.button() == Qt.LeftButton:
+                self.__update_selection_line(ev.buttonDownPos(), ev.pos())
+                if ev.isFinish():
+                    self.__selection_line.hide()
+                    p1 = self.childGroup.mapFromParent(
+                        ev.buttonDownPos(ev.button()))
+                    p2 = self.childGroup.mapFromParent(ev.pos())
+                    indices = np.flatnonzero(self.__get_selected(p1, p2))
+                    selection = list(indices) if len(indices) else None
+                    self.sigSelectionChanged.emit(selection)
+
+    def mouseClickEvent(self, ev):
+        ev.accept()
+        self.sigSelectionChanged.emit(None)
 
 
 class SortProxyModel(QSortFilterProxyModel):
@@ -113,7 +205,7 @@ class ICEPlot(PlotWidget):
     MAX_POINTS_IN_TOOLTIP = 5
 
     def __init__(self, parent: OWWidget):
-        super().__init__(parent, enableMenu=False)
+        super().__init__(parent, enableMenu=False, viewBox=ICEPlotViewBox())
         self.legend = self._create_legend(((1, 0), (1, 0)))
         self.setAntialiasing(True)
         self.setMouseEnabled(False, False)
@@ -126,6 +218,7 @@ class ICEPlot(PlotWidget):
         self.__x_data: Optional[np.ndarray] = None
         self.__y_individual: Optional[np.ndarray] = None
         self.__lines_items: List[pg.PlotCurveItem] = []
+        self.__sel_lines_item: Optional[pg.PlotCurveItem] = None
         self.__mean_line_item: Optional[pg.PlotCurveItem] = None
         self.__hovered_lines_item: Optional[pg.PlotCurveItem] = None
         self.__hovered_scatter_item: Optional[pg.ScatterPlotItem] = None
@@ -148,6 +241,9 @@ class ICEPlot(PlotWidget):
 
         self.__hovered_lines_item.setData(None, None, connect=None)
         self.__hovered_scatter_item.setData(None, None)
+
+        if QApplication.mouseButtons() != Qt.NoButton:
+            return
 
         view_pos: QPointF = self.getViewBox().mapSceneToView(point)
         indices = self._indices_at(view_pos)
@@ -198,8 +294,24 @@ class ICEPlot(PlotWidget):
         self._add_lines(y_average, show_mean, colors, color_col)
         self._set_axes(feature.name, y_label)
         self._set_legend(color_labels, colors)
+        self.getViewBox().set_lines(x_data, y_individual)
 
-    def _set_legend(self, labels: Optional[Tuple], colors: Optional[np.ndarray]):
+    def set_selection(self, selection: Optional[List[int]]):
+        if self.__sel_lines_item is None:
+            return
+        self.__sel_lines_item.setData(None, None, connect=None)
+        if selection is not None:
+            y_individual = self.__y_individual[selection]
+            connect = np.ones(y_individual.shape)
+            connect[:, -1] = 0
+            self.__sel_lines_item.setData(
+                np.tile(self.__x_data, len(y_individual)),
+                y_individual.flatten(),
+                connect=connect.flatten()
+            )
+
+    def _set_legend(self, labels: Optional[Tuple],
+                    colors: Optional[np.ndarray]):
         self.legend.clear()
         self.legend.hide()
         if labels is not None:
@@ -236,16 +348,20 @@ class ICEPlot(PlotWidget):
             y_data = self.__y_individual[mask]
             self.__add_curve_item(x_data, y_data, self.DEFAULT_COLOR)
 
-        width = 3
+        self.__sel_lines_item = pg.PlotCurveItem(
+            pen=pg.mkPen(QColor("#555"), width=2), antialias=True
+        )
+        self.addItem(self.__sel_lines_item)
+
         color = QColor("#1f77b4")
         self.__hovered_lines_item = pg.PlotCurveItem(
-            pen=pg.mkPen(color, width=width), antialias=True
+            pen=pg.mkPen(color, width=2), antialias=True
         )
         self.addItem(self.__hovered_lines_item)
 
         size = 8
         self.__hovered_scatter_item = pg.ScatterPlotItem(
-            pen=color, brush=color, size=8, shape="o"
+            pen=color, brush=color, size=size, shape="o"
         )
         self.addItem(self.__hovered_scatter_item)
 
@@ -280,6 +396,9 @@ class ICEPlot(PlotWidget):
         for lines in self.__lines_items:
             self.removeItem(lines)
         self.__lines_items.clear()
+        if self.__sel_lines_item is not None:
+            self.removeItem(self.__sel_lines_item)
+            self.__sel_lines_item = None
         if self.__hovered_lines_item is not None:
             self.removeItem(self.__hovered_lines_item)
             self.__hovered_lines_item = None
@@ -289,6 +408,7 @@ class ICEPlot(PlotWidget):
         self.clear()
         self.legend.hide()
         self._set_axes(None, None)
+        self.getViewBox().set_lines(None, None)
 
     def __add_curve_item(self, x_data, y_data, color):
         connect = np.ones(y_data.shape)
@@ -374,6 +494,10 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
         model = Input("Model", (SklModel, RandomForestModel))
         data = Input("Data", Table)
 
+    class Outputs:
+        selected_data = Output("Selected Data", Table, default=True)
+        annotated_data = Output(ANNOTATED_DATA_SIGNAL_NAME, Table)
+
     class Error(OWWidget.Error):
         domain_transform_err = Msg("{}")
         unknown_err = Msg("{}")
@@ -392,7 +516,8 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
     color_var = ContextSetting(None)
     centered = Setting(True)
     show_mean = Setting(True)
-    # auto_send = Setting(True)
+    auto_send = Setting(True)
+    selection = Setting(None, schema_only=True)
     visual_settings = Setting({}, schema_only=True)
 
     graph_name = "graph.plotItem"
@@ -405,6 +530,8 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
 
         self.__results: Optional[RunnerResults] = None
         self.__results_avgs: Optional[Dict[ContinuousVariable, float]] = None
+        self.__sampled_mask: Optional[np.ndarray] = None
+        self.__pending_selection = self.selection
         self.model: Optional[Model] = None
         self.data: Optional[Table] = None
         self.graph: ICEPlot = None
@@ -420,12 +547,18 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
     def setup_gui(self):
         self._add_plot()
         self._add_controls()
-        # self._add_buttons()
+        self._add_buttons()
 
     def _add_plot(self):
         box = gui.vBox(self.mainArea)
         self.graph = ICEPlot(self)
+        view_box = self.graph.getViewBox()
+        view_box.sigSelectionChanged.connect(self.__on_selection_changed)
         box.layout().addWidget(self.graph)
+
+    def __on_selection_changed(self, selection: Optional[List[int]]):
+        self.select_instances(selection)
+        self.commit.deferred()
 
     def _add_controls(self):
         box = gui.vBox(self.controlArea, "Target class")
@@ -456,15 +589,15 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
                                         valid_types=DiscreteVariable)
         gui.comboBox(box, self, "color_var", label="Color:", searchable=True,
                      model=self._color_model, orientation=Qt.Horizontal,
-                     contentsLength=12, callback=self.__on_color_var_changed)
+                     contentsLength=12, callback=self.__on_parameter_changed)
         gui.checkBox(box, self, "centered", "Centered",
-                     callback=self.__on_centered_changed)
+                     callback=self.__on_parameter_changed)
         gui.checkBox(box, self, "show_mean", "Show mean",
                      callback=self.__on_show_mean_changed)
 
     def __on_target_changed(self):
         self._apply_feature_sorting()
-        self.setup_plot()
+        self.__on_parameter_changed()
 
     def __on_feature_changed(self, selection: QItemSelection):
         if not selection:
@@ -477,11 +610,10 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
     def __on_order_changed(self):
         self._apply_feature_sorting()
 
-    def __on_color_var_changed(self):
+    def __on_parameter_changed(self):
+        self.__pending_selection = self.selection
         self.setup_plot()
-
-    def __on_centered_changed(self):
-        self.setup_plot()
+        self.apply_selection()
 
     def __on_show_mean_changed(self):
         self.graph.set_show_mean(self.show_mean)
@@ -494,6 +626,7 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
     def set_data(self, data: Optional[Table]):
         self.closeContext()
         self.data = data
+        self.__sampled_mask = None
         self._check_data()
         self._setup_controls()
         self.openContext(self.data.domain if self.data else None)
@@ -510,6 +643,8 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
         if self.data is None:
             return
 
+        self.__sampled_mask = np.ones(len(self.data), dtype=bool)
+
         if len(self.data) < self.MIN_INSTANCES:
             self.data = None
             self.Error.not_enough_data()
@@ -519,10 +654,10 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
             self.Error.no_cont_features()
 
         if self.data and len(self.data) > self.MAX_INSTANCES:
-            kwargs = {"size": self.MAX_INSTANCES, "replace": False}
+            self.__sampled_mask[:] = False
             np.random.seed(0)
-            indices = np.random.choice(len(self.data), **kwargs)
-            self.data = self.data[indices]
+            kws = {"size": self.MAX_INSTANCES, "replace": False}
+            self.__sampled_mask[np.random.choice(len(self.data), **kws)] = True
             self.Information.data_sampled()
 
     def _setup_controls(self):
@@ -571,6 +706,8 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
         self.__results_avgs = None
         self._apply_feature_sorting()
         self._run()
+        self.selection = None
+        self.commit.now()
 
     def _apply_feature_sorting(self):
         if self.data is None or self.model is None:
@@ -584,9 +721,10 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
 
             try:
                 if self.__results_avgs is None:
+                    msk = self.__sampled_mask
                     self.__results_avgs = {
                         feature: individual_condition_expectation(
-                            self.model, self.data, feature, kind="average"
+                            self.model, self.data[msk], feature, kind="average"
                         )["average"] for feature in self._features_model
                     }
                 order = [compute_score(f) for f in self._features_model]
@@ -601,10 +739,12 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
 
     def _run(self):
         self.clear()
-        self.start(run, self.data, self.feature, self.model)
+        data = self.data[self.__sampled_mask] if self.data else None
+        self.start(run, data, self.feature, self.model)
 
     def clear(self):
         self.__results = None
+        self.selection = None
         self.cancel()
         self.Error.domain_transform_err.clear()
         self.Error.unknown_err.clear()
@@ -627,15 +767,16 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
         postfix = f"={class_var.values[self.target_index]} probability" \
             if class_var.is_discrete else ""
 
+        mask = self.__sampled_mask
         colors = None
         color_col = None
         color_labels = None
         if self.color_var and self.color_var.is_discrete:
             colors = self.color_var.colors
-            color_col = self.data.get_column_view(self.color_var)[0]
+            color_col = self.data[mask].get_column_view(self.color_var)[0]
             color_labels = self.color_var.values
 
-        self.graph.set_data(self.data, self.feature,
+        self.graph.set_data(self.data[mask], self.feature,
                             x_data, y_average, y_individual,
                             f"Predicted {class_var.name}{postfix}", colors,
                             color_col, color_labels, self.show_mean)
@@ -646,12 +787,45 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
     def on_done(self, results: Optional[RunnerResults]):
         self.__results = results
         self.setup_plot()
+        self.apply_selection()
+        self.commit.deferred()
+
+    def apply_selection(self):
+        if self.__pending_selection is not None:
+            n_inst = len(self.data)
+            self.__pending_selection = \
+                [i for i in self.__pending_selection if i < n_inst]
+
+            mask = self.__sampled_mask
+            if not all(mask):
+                selection = np.zeros(len(mask), dtype=int)
+                selection[mask] = np.arange(sum(mask))
+                self.__pending_selection = selection[self.__pending_selection]
+
+            self.select_instances(self.__pending_selection)
+            self.__pending_selection = None
+
+    def select_instances(self, selection: Optional[List[int]]):
+        self.graph.set_selection(selection)
+        if selection is not None:
+            indices = np.arange(len(self.__sampled_mask))[self.__sampled_mask]
+            self.selection = list(indices[selection])
+        else:
+            self.selection = None
 
     def on_exception(self, ex: Exception):
         if isinstance(ex, DomainTransformationError):
             self.Error.domain_transform_err(ex)
         else:
             self.Error.unknown_err(ex)
+
+    @gui.deferred
+    def commit(self):
+        selected = self.data[self.selection] \
+            if self.data is not None and self.selection is not None else None
+        annotated = create_annotated_table(self.data, self.selection)
+        self.Outputs.selected_data.send(selected)
+        self.Outputs.annotated_data.send(annotated)
 
     def onDeleteWidget(self):
         self.shutdown()

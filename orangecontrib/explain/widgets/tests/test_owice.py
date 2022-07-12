@@ -1,10 +1,13 @@
 # pylint: disable=missing-docstring
 import unittest
+from unittest.mock import Mock
 
-from orangewidget.tests.base import WidgetTest
+from AnyQt.QtCore import Qt, QPointF
+
 from Orange.classification import RandomForestLearner
 from Orange.data import Table
 from Orange.regression import RandomForestRegressionLearner
+from Orange.widgets.tests.base import WidgetTest
 from orangecontrib.explain.widgets.owice import OWICE
 
 
@@ -41,6 +44,13 @@ class TestOWICE(WidgetTest):
         self.wait_until_finished()
         self.assertTrue(self.widget.Error.domain_transform_err.is_shown())
 
+    def test_output(self):
+        self.send_signal(self.widget.Inputs.data, self.heart)
+        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+        self.assertIsNone(self.get_output(self.widget.Outputs.selected_data))
+        annotated = self.get_output(self.widget.Outputs.annotated_data)
+        self.assertEqual(len(annotated), len(self.heart))
+
     def test_discrete_features(self):
         self.send_signal(self.widget.Inputs.data, self.titanic)
         self.assertTrue(self.widget.Error.no_cont_features.is_shown())
@@ -73,6 +83,53 @@ class TestOWICE(WidgetTest):
         self.assertFalse(self.widget.Error.not_enough_data.is_shown())
         self.send_signal(self.widget.Inputs.data, None)
         self.assertFalse(self.widget.Information.data_sampled.is_shown())
+
+    def test_selection(self):
+        self.send_signal(self.widget.Inputs.data, self.heart)
+        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+        self.wait_until_finished()
+
+        event = Mock()
+        event.button.return_value = Qt.LeftButton
+        event.buttonDownPos.return_value = QPointF(30, -0.2)
+        event.pos.return_value = QPointF(50, -0.3)
+        event.isFinish.return_value = True
+
+        self.widget.graph.getViewBox().mouseDragEvent(event)
+        self.assertIsInstance(self.widget.selection, list)
+        self.assertListEqual(self.widget.selection, [52, 214])
+        selected = self.get_output(self.widget.Outputs.selected_data)
+        self.assertEqual(len(selected), 2)
+
+        self.widget.graph.getViewBox().mouseClickEvent(event)
+        self.assertIsNone(self.widget.selection)
+        self.assertIsNone(self.get_output(self.widget.Outputs.selected_data))
+
+        self.widget.graph.getViewBox().mouseDragEvent(event)
+        self.assertIsNotNone(self.get_output(self.widget.Outputs.selected_data))
+
+        self.send_signal(self.widget.Inputs.model, None)
+        self.assertIsNone(self.get_output(self.widget.Outputs.selected_data))
+
+    def test_saved_selection(self):
+        self.send_signal(self.widget.Inputs.data, self.heart)
+        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+        self.wait_until_finished()
+        event = Mock()
+        event.button.return_value = Qt.LeftButton
+        event.buttonDownPos.return_value = QPointF(30, -0.2)
+        event.pos.return_value = QPointF(50, -0.3)
+        event.isFinish.return_value = True
+        self.widget.graph.getViewBox().mouseDragEvent(event)
+        output1 = self.get_output(self.widget.Outputs.selected_data)
+
+        settings = self.widget.settingsHandler.pack_data(self.widget)
+        widget = self.create_widget(OWICE, stored_settings=settings)
+        self.send_signal(widget.Inputs.data, self.heart, widget=widget)
+        self.send_signal(widget.Inputs.model, self.rf_cls, widget=widget)
+        self.wait_until_finished(widget=widget)
+        output2 = self.get_output(widget.Outputs.selected_data, widget=widget)
+        self.assert_table_equal(output1, output2)
 
     def test_send_report(self):
         self.widget.send_report()
