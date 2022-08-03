@@ -12,6 +12,7 @@ Widgets
    widgets/explain-model
    widgets/explain-prediction
    widgets/explain-predictions
+   widgets/ice
 
 Indices and tables
 ==================
