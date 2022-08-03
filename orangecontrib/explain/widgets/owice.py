@@ -759,13 +759,17 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
         y_average = self.__results.y_average[self.target_index]
         y_individual = self.__results.y_individual[self.target_index]
 
+        class_var: Variable = self.model.original_domain.class_var
+        if class_var.is_discrete:
+            cls_val = class_var.values[self.target_index]
+            y_label = f"P({class_var.name}={cls_val})"
+        else:
+            y_label = f"{class_var.name}"
+
         if self.centered:
             y_average = y_average - y_average[0, None]
             y_individual = y_individual - y_individual[:, 0, None]
-
-        class_var: Variable = self.model.original_domain.class_var
-        postfix = f"={class_var.values[self.target_index]} probability" \
-            if class_var.is_discrete else ""
+            y_label = "Δ " + y_label
 
         mask = self.__sampled_mask
         colors = None
@@ -777,8 +781,7 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
             color_labels = self.color_var.values
 
         self.graph.set_data(self.data[mask], self.feature,
-                            x_data, y_average, y_individual,
-                            f"Predicted {class_var.name}{postfix}", colors,
+                            x_data, y_average, y_individual, y_label, colors,
                             color_col, color_labels, self.show_mean)
 
     def on_partial_result(self, _):
