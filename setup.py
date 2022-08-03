@@ -7,7 +7,7 @@ from setuptools import setup, find_packages
 
 NAME = "Orange3-Explain"
 
-VERSION = "0.5.3"
+VERSION = "0.5.4"
 
 AUTHOR = "Bioinformatics Laboratory, FRI UL"
 AUTHOR_EMAIL = "contact@orange.biolab.si"
@@ -45,6 +45,7 @@ INSTALL_REQUIRES = [
     "pyqtgraph",
     "scipy",
     "shap ==0.40.*",  # shap makes significant changes between versions
+    "scikit-learn>=1.0.1",
 ]
 
 EXTRAS_REQUIRE = {

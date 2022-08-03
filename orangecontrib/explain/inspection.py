@@ -1,12 +1,13 @@
 """ Permutation feature importance for models. """
-from typing import Callable
+from typing import Callable, Tuple, Optional, Dict
 
 import numpy as np
 import scipy.sparse as sp
+from sklearn.inspection import partial_dependence
 
-from Orange.base import Model
+from Orange.base import Model, SklModel
 from Orange.classification import Model as ClsModel
-from Orange.data import Table
+from Orange.data import Table, Variable, DiscreteVariable
 from Orange.evaluation import Results
 from Orange.evaluation.scoring import Score, TargetScore, RegressionScore, R2
 from Orange.regression import Model as RegModel
@@ -19,7 +20,7 @@ def permutation_feature_importance(
         score: Score,
         n_repeats: int = 5,
         progress_callback: Callable = None
-):
+) -> np.ndarray:
     """
     Function calculates feature importance of a model for a given data.
 
@@ -174,3 +175,46 @@ def _calculate_permutation_scores(
 
     progress_callback(1)
     return scores
+
+
+def individual_condition_expectation(
+        model: SklModel,
+        data: Table,
+        feature: Variable,
+        grid_resolution: int = 1000,
+        kind: str = "both",
+        progress_callback: Callable = dummy_callback
+) -> Dict[str, np.ndarray]:
+    progress_callback(0)
+    _check_data(data)
+    needs_pp = _check_model(model, data)
+    if needs_pp:
+        data = model.data_to_model_domain(data)
+
+    assert feature.name in [a.name for a in data.domain.attributes]
+    feature_index = data.domain.index(feature.name)
+
+    assert isinstance(model, SklModel), f"Model ({model}) is not supported."
+    progress_callback(0.1)
+
+    dep = partial_dependence(model.skl_model,
+                             data.X,
+                             [feature_index],
+                             grid_resolution=grid_resolution,
+                             kind=kind)
+
+    results = {"average": dep["average"], "values": dep["values"][0]}
+    if kind == "both":
+        results["individual"] = dep["individual"]
+
+    if data.domain.has_discrete_class and \
+            len(data.domain.class_var.values) == 2:
+        results = {"average": np.vstack([1 - dep["average"], dep["average"]]),
+                   "values": dep["values"][0]}
+        if kind == "both":
+            results["individual"] = \
+                np.vstack([1 - dep["individual"], dep["individual"]])
+
+    progress_callback(1)
+
+    return results
