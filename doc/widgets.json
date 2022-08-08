@@ -1,0 +1,65 @@
+[
+ [
+  "Explain",
+  [
+   {
+    "text": "Feature Importance",
+    "doc": "widgets/permutation-importance.md",
+    "icon": "../orangecontrib/explain/widgets/icons/PermutationImportance.svg",
+    "background": "#E4B8E4",
+    "keywords": [
+     "explain",
+     "model",
+     "permutation",
+     "feature",
+     "importance"
+    ]
+   },
+   {
+    "text": "Explain Model",
+    "doc": "widgets/explain-model.md",
+    "icon": "../orangecontrib/explain/widgets/icons/ExplainModel.svg",
+    "background": "#E4B8E4",
+    "keywords": [
+     "explain",
+     "explain prediction",
+     "explain model"
+    ]
+   },
+   {
+    "text": "Explain Prediction",
+    "doc": "widgets/explain-prediction.md",
+    "icon": "../orangecontrib/explain/widgets/icons/ExplainPred.svg",
+    "background": "#E4B8E4",
+    "keywords": [
+     "explain",
+     "explain prediction",
+     "explain model"
+    ]
+   },
+   {
+    "text": "Explain Predictions",
+    "doc": "widgets/explain-predictions.md",
+    "icon": "../orangecontrib/explain/widgets/icons/ExplainPredictions.svg",
+    "background": "#E4B8E4",
+    "keywords": [
+     "explain",
+     "explain prediction",
+     "explain model"
+    ]
+   },
+   {
+    "text": "ICE",
+    "doc": "widgets/ice.md",
+    "icon": "../orangecontrib/explain/widgets/icons/ICE.svg",
+    "background": "#E4B8E4",
+    "keywords": [
+     "ICE",
+     "PDP",
+     "partial",
+     "dependence"
+    ]
+   }
+  ]
+ ]
+]
