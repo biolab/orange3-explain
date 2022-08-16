@@ -15,7 +15,7 @@ import pyqtgraph as pg
 from orangecanvas.gui.utils import disconnected
 from orangewidget.utils.listview import ListViewSearch
 
-from Orange.base import Model, SklModel, RandomForestModel
+from Orange.base import Model
 from Orange.data import Table, ContinuousVariable, Variable, \
     DiscreteVariable
 from Orange.data.table import DomainTransformationError
@@ -491,7 +491,7 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
     priority = 130
 
     class Inputs:
-        model = Input("Model", (SklModel, RandomForestModel))
+        model = Input("Model", Model)
         data = Input("Data", Table)
 
     class Outputs:

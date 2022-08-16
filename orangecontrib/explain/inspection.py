@@ -1,13 +1,13 @@
 """ Permutation feature importance for models. """
-from typing import Callable, Tuple, Optional, Dict
+from typing import Callable, Dict
 
 import numpy as np
 import scipy.sparse as sp
 from sklearn.inspection import partial_dependence
 
-from Orange.base import Model, SklModel
+from Orange.base import Model
 from Orange.classification import Model as ClsModel
-from Orange.data import Table, Variable, DiscreteVariable
+from Orange.data import Table, Variable
 from Orange.evaluation import Results
 from Orange.evaluation.scoring import Score, TargetScore, RegressionScore, R2
 from Orange.regression import Model as RegModel
@@ -178,7 +178,7 @@ def _calculate_permutation_scores(
 
 
 def individual_condition_expectation(
-        model: SklModel,
+        model: Model,
         data: Table,
         feature: Variable,
         grid_resolution: int = 1000,
@@ -194,10 +194,18 @@ def individual_condition_expectation(
     assert feature.name in [a.name for a in data.domain.attributes]
     feature_index = data.domain.index(feature.name)
 
-    assert isinstance(model, SklModel), f"Model ({model}) is not supported."
+    # fake sklearn estimator
+    model.fit = None
+    model.fit_ = None
+    if model.domain.class_var.is_discrete:
+        model._estimator_type = "classifier"
+        model.classes_ = model.domain.class_var.values
+    else:
+        model._estimator_type = "regressor"
+
     progress_callback(0.1)
 
-    dep = partial_dependence(model.skl_model,
+    dep = partial_dependence(model,
                              data.X,
                              [feature_index],
                              grid_resolution=grid_resolution,
