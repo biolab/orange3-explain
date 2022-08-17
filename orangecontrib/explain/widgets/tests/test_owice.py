@@ -7,7 +7,7 @@ from AnyQt.QtCore import Qt, QPointF
 from Orange.classification import RandomForestLearner, CalibratedLearner, \
     ThresholdLearner
 from Orange.data import Table
-from Orange.regression import RandomForestRegressionLearner, CurveFitLearner, \
+from Orange.regression import RandomForestRegressionLearner, \
     SimpleRandomForestLearner
 from Orange.tests.test_classification import all_learners as all_cls_learners
 from Orange.tests.test_regression import all_learners as all_reg_learners, \

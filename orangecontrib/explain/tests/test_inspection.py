@@ -350,35 +350,6 @@ class TestIndividualConditionalExpectation(unittest.TestCase):
         self.assertEqual(res["individual"].shape, (2, 303, 41))
         self.assertEqual(res["values"].shape, (41,))
 
-    def _test_sklearn(self):
-        from matplotlib import pyplot as plt
-        from sklearn.ensemble import RandomForestClassifier, \
-            RandomForestRegressor
-        from sklearn.inspection import PartialDependenceDisplay
-
-        X = self.housing.X
-        y = self.housing.Y
-        model = RandomForestRegressor(random_state=0)
-
-        # X = self.iris.X[:100]
-        # y = self.iris.Y[:100]
-        # y = np.abs(y - 1)
-        # model = RandomForestClassifier(random_state=0)
-        model.fit(X, y)
-        display = PartialDependenceDisplay.from_estimator(
-            model,
-            X,
-            [X.shape[1] - 1],
-            target=0,
-            kind="both",
-            centered=True,
-            subsample=1000,
-            # grid_resolution=100,
-            random_state=0,
-        )
-
-        plt.show()
-
 
 if __name__ == "__main__":
     unittest.main()
