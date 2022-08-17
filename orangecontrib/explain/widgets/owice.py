@@ -17,7 +17,7 @@ from orangewidget.utils.listview import ListViewSearch
 
 from Orange.base import Model
 from Orange.data import Table, ContinuousVariable, Variable, \
-    DiscreteVariable
+    DiscreteVariable, Domain
 from Orange.data.table import DomainTransformationError
 from Orange.widgets import gui
 from Orange.widgets.settings import ContextSetting, Setting, \
@@ -534,6 +534,7 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
         self.__pending_selection = self.selection
         self.model: Optional[Model] = None
         self.data: Optional[Table] = None
+        self.domain: Optional[Domain] = None
         self.graph: ICEPlot = None
         self._target_combo: QComboBox = None
         self._features_view: ListViewSearch = None
@@ -624,13 +625,9 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
     @Inputs.data
     @check_sql_input
     def set_data(self, data: Optional[Table]):
-        self.closeContext()
         self.data = data
         self.__sampled_mask = None
         self._check_data()
-        self._setup_controls()
-        self.openContext(self.data.domain if self.data else None)
-        self.set_list_view_selection()
 
     @Inputs.model
     def set_model(self, model: Optional[Model]):
@@ -660,8 +657,29 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
             self.__sampled_mask[np.random.choice(len(self.data), **kws)] = True
             self.Information.data_sampled()
 
+    def handleNewSignals(self):
+        self.closeContext()
+        self.domain = None
+        if self.data and self.model:
+            model_domain = [a.name for a in self.model.domain]
+            attributes = [a for a in self.data.domain.attributes
+                          if a.is_continuous and a.name in model_domain
+                          or a.is_discrete]
+            class_var = self.model.domain.class_var
+            metas = [m for m in self.data.domain.metas if m.is_discrete]
+            self.domain = Domain(attributes, class_var, metas)
+        self._setup_controls()
+        self.openContext(self.domain)
+        self.set_list_view_selection()
+
+        self.__results_avgs = None
+        self._apply_feature_sorting()
+        self._run()
+        self.selection = None
+        self.commit.now()
+
     def _setup_controls(self):
-        domain = self.data.domain if self.data else None
+        domain = self.domain
 
         self._target_combo.clear()
         self._target_combo.setEnabled(True)
@@ -701,13 +719,6 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
         selection = view.selectedIndexes()
         if len(selection) == 1:
             view.scrollTo(selection[0])
-
-    def handleNewSignals(self):
-        self.__results_avgs = None
-        self._apply_feature_sorting()
-        self._run()
-        self.selection = None
-        self.commit.now()
 
     def _apply_feature_sorting(self):
         if self.data is None or self.model is None:
