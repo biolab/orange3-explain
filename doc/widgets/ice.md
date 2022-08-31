@@ -8,8 +8,12 @@ Displays one line per instance that shows how the instance’s prediction change
 - Model: model
 - Data: dataset
 
-The **ICE** (Individual Conditional Expectation) widget visualizes the dependence of the prediction on a feature for each instance separately, resulting in one line per instance, compared to one line overall in partial dependence plots.
+**Outputs**
 
+- Selected Data: instances selected from the plot
+- Data: data with an additional column showing whether a point is selected
+
+The **ICE** (Individual Conditional Expectation) widget visualizes the dependence of the prediction on a feature for each instance separately, resulting in one line per instance, compared to one line overall in partial dependence plots.
 
 ![](images/ICE.png)
 
@@ -23,12 +27,13 @@ The **ICE** (Individual Conditional Expectation) widget visualizes the dependenc
    Alternatively, click **Send**.
 7. Get help, save the plot, make the report, set plot properties, or observe the size of input and output data.
 8. Plot shows a line for each instance in the input dataset.
+9. An interactive plot. Each line represents an instance in the dataset. To select a line, click and drag a line over it.
 
 Example
 -------
 
-In the flowing example, we use the ICE widget to explain Random Forest model. In the File widget, we open the Housing dataset. We connect it to the Random Forest widget, which trains the model. The ICE widget accepts the model and data which are used to explain the model.
+In the following example, we use the ICE widget to explain a [Random Forest](https://orangedatamining.com/widget-catalog/model/randomforest/) model. In the [File](https://orangedatamining.com/widget-catalog/data/file/) widget, we open the *housing* dataset. We connect it to the Random Forest widget, which trains the model. The ICE widget accepts the model and data which are used to explain the model.
 
 By selecting some arbitrary lines, the selected instances of the input dataset appear on the output of the ICE widget.
 
-![](images/ICE-Example.png)
+![](images/ICE-example.png)
