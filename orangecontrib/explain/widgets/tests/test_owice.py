@@ -4,9 +4,14 @@ from unittest.mock import Mock
 
 from AnyQt.QtCore import Qt, QPointF
 
-from Orange.classification import RandomForestLearner
+from Orange.classification import RandomForestLearner, CalibratedLearner, \
+    ThresholdLearner
 from Orange.data import Table
-from Orange.regression import RandomForestRegressionLearner
+from Orange.regression import RandomForestRegressionLearner, \
+    SimpleRandomForestLearner
+from Orange.tests.test_classification import all_learners as all_cls_learners
+from Orange.tests.test_regression import all_learners as all_reg_learners, \
+    init_learner
 from Orange.widgets.tests.base import WidgetTest
 from orangecontrib.explain.widgets.owice import OWICE
 
@@ -50,6 +55,30 @@ class TestOWICE(WidgetTest):
         self.assertIsNone(self.get_output(self.widget.Outputs.selected_data))
         annotated = self.get_output(self.widget.Outputs.annotated_data)
         self.assertEqual(len(annotated), len(self.heart))
+
+    def test_all_reg_models(self):
+        data = self.housing[:10]
+        self.send_signal(self.widget.Inputs.data, data)
+        for learner in all_reg_learners():
+            if issubclass(learner, (SimpleRandomForestLearner,)):
+                continue
+            learner = init_learner(learner, data)
+            model = learner(data)
+            self.send_signal(self.widget.Inputs.model, model)
+            self.wait_until_finished()
+            self.assertFalse(self.widget.Error.unknown_err.is_shown())
+
+    def test_all_cls_models(self):
+        data = self.heart[:10]
+        self.send_signal(self.widget.Inputs.data, data)
+        for learner in all_cls_learners():
+            if issubclass(learner, (CalibratedLearner, ThresholdLearner)):
+                model = learner(RandomForestLearner())(data)
+            else:
+                model = learner()(data)
+            self.send_signal(self.widget.Inputs.model, model)
+            self.wait_until_finished()
+            self.assertFalse(self.widget.Error.unknown_err.is_shown())
 
     def test_discrete_features(self):
         self.send_signal(self.widget.Inputs.data, self.titanic)
