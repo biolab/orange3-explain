@@ -507,7 +507,7 @@ class OWExplainPrediction(OWWidget, ConcurrentWidgetMixin):
 
     settingsHandler = ClassValuesContextHandler()
     target_index = ContextSetting(0)
-    stripe_len = Setting(10)
+    stripe_len: int = Setting(10)
 
     graph_name = "scene"
 
@@ -551,7 +551,7 @@ class OWExplainPrediction(OWWidget, ConcurrentWidgetMixin):
         gui.rubber(self.controlArea)
 
         box = gui.vBox(self.buttonsArea, "Prediction info")
-        gui.label(box, self, "%(mo_info)s")  # type: QLabel
+        gui.label(box, self, "%(mo_info)s")
         bv_label = gui.label(box, self, "%(bv_info)s")  # type: QLabel
         bv_label.setToolTip("The average prediction for selected class.")
 
@@ -563,9 +563,12 @@ class OWExplainPrediction(OWWidget, ConcurrentWidgetMixin):
             self._stripe_plot.set_height(self.stripe_len)
 
     def __zoom_changed(self, delta: float):
-        self.stripe_len = max(min(self.stripe_len + delta,
-                                  self._size_slider.maximum()),
-                              self._size_slider.minimum())
+        self.stripe_len = round(
+            max(
+                min(self.stripe_len + delta, self._size_slider.maximum()),
+                self._size_slider.minimum(),
+            )
+        )
         self._size_slider.setValue(self.stripe_len)
         self.__size_slider_changed()
 
