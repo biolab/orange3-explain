@@ -37,7 +37,7 @@ def dummy_run(data, model, _):
     mask[150:] = False
     m = min(150, m)
     return Results(x=[np.ones((m, n)) for _ in range(k)],
-                   colors=np.zeros((m, n) + (3,)),
+                   colors=np.zeros((m, n) + (3,), dtype=int),
                    names=[str(i) for i in range(n)],
                    mask=mask)
 

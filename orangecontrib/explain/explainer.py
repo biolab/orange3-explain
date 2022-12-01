@@ -275,9 +275,9 @@ def compute_colors(data: Table) -> np.ndarray:
 
     Returns
     -------
-   Colors for each data instance and each feature. The shape of the matrix is
-   M x N x C, where M is a number of instances, N is a number of features, and
-   C is 3 (one value for each RGB channel).
+    Colors for each data instance and each feature. The shape of the matrix is
+    M x N x C, where M is a number of instances, N is a number of features, and
+    C is 3 (one value for each RGB channel).
     """
 
     def continuous_colors(x):
@@ -291,7 +291,7 @@ def compute_colors(data: Table) -> np.ndarray:
         normalized_x[:, max_ == min_] = 0.5
 
         v = [normalized_x * (b - a) + a for (a, b) in zip(RGB_LOW, RGB_HIGH)]
-        cont_colors = np.dstack(v)
+        cont_colors = np.dstack(v).astype(int)
 
         # missing values are imputed as gray
         return cont_colors
@@ -310,7 +310,7 @@ def compute_colors(data: Table) -> np.ndarray:
 
     # the final array is dense and we do not expect huge matrices here
     values = data.X.toarray() if sparse.issparse(data.X) else data.X
-    colors = np.zeros(values.shape + (3,))
+    colors = np.zeros(values.shape + (3,), dtype=int)
     is_discrete = np.array(
         [a.is_discrete for a in data.domain.attributes], dtype=bool
     )
