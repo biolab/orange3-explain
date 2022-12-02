@@ -5,4 +5,4 @@ on:
 jobs:
   rebase:
     uses: biolab/orange-ci-cd/.github/workflows/rebase-addons.yml@master
-
+    secrets: inherit
