@@ -123,19 +123,6 @@ class TestUtils(unittest.TestCase):
         mocked_model.predict.assert_not_called()
         self.assertAlmostEqual(baseline_score, 2, 0)
 
-    def test_remove_init_unlocked(self):
-        """
-        When this test starts to fail:
-        - remove code in
-        /Users/vesna/orange3-explain/orangecontrib/explain/__init__.py
-        - remove this test
-        - set minimum Orange version to 3.31.0
-        """
-        self.assertGreater(
-            "3.35.0",
-            pkg_resources.get_distribution("orange3").version
-        )
-
 
 class TestPermutationFeatureImportance(unittest.TestCase):
     @classmethod
@@ -308,7 +295,8 @@ class TestIndividualConditionalExpectation(unittest.TestCase):
         data = data.transform(Domain(data.domain.attributes, class_var))
         model1 = RandomForestLearner(n_estimators=10, random_state=0)(data)
 
-        data.Y = np.abs(data.Y - 1)
+        with data.unlocked(data.Y):
+            data.Y = np.abs(data.Y - 1)
         model2 = RandomForestLearner(n_estimators=10, random_state=0)(data)
 
         res = individual_condition_expectation(model1, data, data.domain[0])
