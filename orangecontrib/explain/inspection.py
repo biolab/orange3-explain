@@ -187,7 +187,14 @@ def individual_condition_expectation(
 ) -> Dict[str, np.ndarray]:
     progress_callback(0)
     _check_data(data)
+
+    # implicit check if feature in data.domain
     needs_pp = _check_model(model, data)
+
+    # values should not be preprocessed
+    orig_values = data[:, feature].X.flatten()
+    _, index = np.unique(orig_values, return_index=True)
+    orig_values = orig_values[index]
     if needs_pp:
         data = model.data_to_model_domain(data)
 
@@ -211,7 +218,7 @@ def individual_condition_expectation(
                              grid_resolution=grid_resolution,
                              kind=kind)
 
-    results = {"average": dep["average"], "values": dep["values"][0]}
+    results = {"average": dep["average"], "values": orig_values}
     if kind == "both":
         results["individual"] = dep["individual"]
 
