@@ -241,6 +241,9 @@ class TestExplainer(unittest.TestCase):
     def test_compute_colors(self):
         heart_disease = Table.from_file("heart_disease.tab")
         colors = compute_colors(heart_disease)
+        self.assertEqual(colors.dtype, int)
+        self.assertTrue((colors <= 255).all())
+        self.assertTrue((colors >= 0).all())
         self.assertTupleEqual(colors.shape, heart_disease.X.shape + (3,))
 
         # the way to add colors to attributes

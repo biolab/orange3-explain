@@ -291,7 +291,7 @@ def compute_colors(data: Table) -> np.ndarray:
         normalized_x[:, max_ == min_] = 0.5
 
         v = [normalized_x * (b - a) + a for (a, b) in zip(RGB_LOW, RGB_HIGH)]
-        cont_colors = np.dstack(v).astype(int)
+        cont_colors = np.dstack(v)
 
         # missing values are imputed as gray
         return cont_colors
@@ -310,7 +310,7 @@ def compute_colors(data: Table) -> np.ndarray:
 
     # the final array is dense and we do not expect huge matrices here
     values = data.X.toarray() if sparse.issparse(data.X) else data.X
-    colors = np.zeros(values.shape + (3,), dtype=int)
+    colors = np.zeros(values.shape + (3,), dtype=float)
     is_discrete = np.array(
         [a.is_discrete for a in data.domain.attributes], dtype=bool
     )
@@ -322,7 +322,7 @@ def compute_colors(data: Table) -> np.ndarray:
     )
 
     colors[np.isnan(colors)] = 100
-    return colors
+    return colors.astype(int)
 
 
 def get_shap_values_and_colors(
