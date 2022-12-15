@@ -324,20 +324,20 @@ class TestOWPermutationImportance(WidgetTest):
         sparse_model = RandomForestLearner(random_state=0)(sparse_data)
         self.send_signal(self.widget.Inputs.data, sparse_data)
         self.send_signal(self.widget.Inputs.model, sparse_model)
-        self.wait_until_finished()
+        self.wait_until_finished(timeout=10000)
         self.assertFalse(self.widget.Error.domain_transform_err.is_shown())
         self.assertFalse(self.widget.Error.unknown_err.is_shown())
 
         model = RandomForestLearner(random_state=0)(data)
         self.send_signal(self.widget.Inputs.data, sparse_data)
         self.send_signal(self.widget.Inputs.model, model)
-        self.wait_until_finished()
+        self.wait_until_finished(timeout=10000)
         self.assertFalse(self.widget.Error.domain_transform_err.is_shown())
         self.assertFalse(self.widget.Error.unknown_err.is_shown())
 
         self.send_signal(self.widget.Inputs.data, data)
         self.send_signal(self.widget.Inputs.model, sparse_model)
-        self.wait_until_finished()
+        self.wait_until_finished(timeout=10000)
         self.assertFalse(self.widget.Error.domain_transform_err.is_shown())
         self.assertFalse(self.widget.Error.unknown_err.is_shown())
 
@@ -416,17 +416,6 @@ class TestOWPermutationImportance(WidgetTest):
         self.assertEqual(font1.family(), font2.family())
         self.assertEqual(font1.pointSize(), font2.pointSize())
         self.assertEqual(font1.italic(), font2.italic())
-
-    def test_orange_version(self):
-        """
-        This test serves as a reminder.
-
-        When it starts to fail, remove it and remove the lines 18, 305 - 306 in
-        owpermutationimportance.py
-        """
-        from Orange.version import version
-
-        self.assertLess(version, "3.35.0")
 
 
 if __name__ == "__main__":
