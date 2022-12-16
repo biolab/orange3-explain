@@ -2,7 +2,7 @@ import inspect
 import unittest
 
 import numpy as np
-
+from numpy.testing import assert_array_equal
 from Orange.classification import (
     LogisticRegressionLearner,
     RandomForestLearner,
@@ -11,10 +11,17 @@ from Orange.classification import (
     TreeLearner,
     ThresholdLearner,
 )
-from Orange.data import Table, Domain
+from Orange.data import Table, Domain, ContinuousVariable
 from Orange.regression import LinearRegressionLearner, CurveFitLearner
 from Orange.tests import test_regression, test_classification
 from Orange.widgets.data import owcolor
+from Orange.modelling import GBLearner
+try:
+    from Orange.modelling import XGBLearner, XGBRFLearner
+except ImportError:
+    XGBLearner = XGBRFLearner = None
+from shap import TreeExplainer
+
 from orangecontrib.explain.explainer import (
     compute_colors,
     compute_shap_values,
@@ -32,6 +39,7 @@ class TestExplainer(unittest.TestCase):
         self.iris = Table.from_file("iris")
         self.housing = Table.from_file("housing")[:100, -10:]
         self.titanic = Table("titanic")
+        self.hearth_disease = Table("heart_disease")
 
     def test_tree_explainer(self):
         learner = RandomForestLearner()
@@ -138,6 +146,9 @@ class TestExplainer(unittest.TestCase):
         self.assertTrue(np.any(shap_values[1]))
         # missing class has all shap values 0
         self.assertFalse(np.any(shap_values[2]))
+        self.assertNotEqual(base_value[0], 0)
+        self.assertNotEqual(base_value[1], 0)
+        self.assertEqual(base_value[2], 0)
 
         # for one class SHAP returns only array (not list of arrays) -
         # must be handled
@@ -150,7 +161,7 @@ class TestExplainer(unittest.TestCase):
         self.assertEqual(len(shap_values), 3)
         self.assertTupleEqual((3,), base_value.shape)
 
-        # for Logistic regression Orange handle that - test anyway
+        # for Logistic regression Orange handles that - test anyway
         learner = LogisticRegressionLearner()
         model = learner(self.iris[:100])
 
@@ -159,10 +170,84 @@ class TestExplainer(unittest.TestCase):
         )
         self.assertEqual(len(shap_values), 3)
         self.assertTupleEqual((3,), base_value.shape)
-        self.assertNotEqual(shap_values[0].sum(), 0)
-        self.assertNotEqual(shap_values[1].sum(), 0)
+        self.assertTrue(np.any(shap_values[0]))
+        self.assertTrue(np.any(shap_values[1]))
         # missing class has all shap values 0
-        self.assertTrue(not np.any(shap_values[2].sum()))
+        self.assertFalse(np.any(shap_values[2]))
+        self.assertNotEqual(base_value[0], 0)
+        self.assertNotEqual(base_value[1], 0)
+        self.assertEqual(base_value[2], 0)
+
+        learner = RandomForestLearner()
+        data = Table.concatenate((self.iris[:50], self.iris[100:]))
+        model = learner(data)
+        shap_values, _, _, base_value = compute_shap_values(model, data, data)
+        self.assertEqual(len(shap_values), 3)
+        self.assertTupleEqual((3,), base_value.shape)
+        self.assertTrue(np.any(shap_values[0]))
+        # missing class has all shap values 0
+        self.assertFalse(np.any(shap_values[1]))
+        self.assertTrue(np.any(shap_values[2]))
+        self.assertNotEqual(base_value[0], 0)
+        self.assertEqual(base_value[1], 0)
+        self.assertNotEqual(base_value[2], 0)
+
+    @unittest.skipIf(XGBLearner is None, "Missing 'xgboost' package")
+    def test_gradient_boosting_shape(self):
+        """
+        TreeExplainer library for XGBClassifier and GradientBoostingClassifier
+        in case of binary classification outputs only explanation for
+        the class 1. Test workaround that adds explanation for class 0.
+        """
+        learner = XGBLearner()
+        model = learner(self.hearth_disease)
+        shap_values, _, _, base_value = compute_shap_values(
+            model, self.hearth_disease, self.hearth_disease
+        )
+        self.assertEqual(len(shap_values), 2)
+        self.assertEqual(len(base_value), 2)
+        assert_array_equal(-shap_values[0], shap_values[1])
+
+        learner = GBLearner()
+        model = learner(self.hearth_disease)
+        shap_values, _, _, base_value = compute_shap_values(
+            model, self.hearth_disease, self.hearth_disease
+        )
+        self.assertEqual(len(shap_values), 2)
+        self.assertEqual(len(base_value), 2)
+        assert_array_equal(-shap_values[0], shap_values[1])
+
+        learner = XGBRFLearner()
+        model = learner(self.hearth_disease)
+        shap_values, _, _, base_value = compute_shap_values(
+            model, self.hearth_disease, self.hearth_disease
+        )
+        self.assertEqual(len(shap_values), 2)
+        self.assertEqual(len(base_value), 2)
+        assert_array_equal(-shap_values[0], shap_values[1])
+
+    @unittest.skipIf(XGBLearner is None, "Missing 'xgboost' package")
+    def test_remove_workaround(self):
+        """
+        TreeExplainer for XGBClassifier and GradientBoostingClassifier
+        in case of binary classification outputs only explanation for
+        the class 1. Test if it is still the case. When test starts to fail:
+        - remove the test
+        - remove the workaround currently at line 118 from the code
+        """
+        domain = self.hearth_disease.domain
+        hd = self.hearth_disease.transform(
+            Domain(
+                [a for a in domain.attributes if isinstance(a, ContinuousVariable)],
+                class_vars=domain.class_vars,
+            ),
+        )
+        learner = XGBLearner()
+        model = learner(hd)
+        explainer = TreeExplainer(model.skl_model, data=hd.X)
+        shap_values = explainer.shap_values(hd.X[:10], check_additivity=False)
+        # # when it will be fixed the output will have shape (2,) + hs.X.shape
+        self.assertEqual(shap_values.shape, (10, hd.X.shape[1]))
 
     def test_all_classifiers(self):
         """ Test explanation for all classifiers """

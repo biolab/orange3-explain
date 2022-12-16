@@ -3,7 +3,6 @@ from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
 from scipy import sparse
-
 from shap import KernelExplainer, TreeExplainer
 from shap.utils import sample, hclust_ordering
 from shap.utils._legacy import kmeans
@@ -95,11 +94,6 @@ def _explain_trees(
 
     # TreeExplaner cannot explain in normal time more cases than 1000
     data_sample, sample_mask = _subsample_data(transformed_data, 1000)
-    num_classes = (
-        len(model.domain.class_var.values)
-        if model.domain.class_var.is_discrete
-        else None
-    )
 
     # this method will work in batches since explaining only one attribute
     # at time the processing timed doubles comparing to batch size 10
@@ -112,14 +106,31 @@ def _explain_trees(
 
     shap_values = _join_shap_values(shap_values)
     base_value = explainer.expected_value
-    # when in training phase one class value was missing skl_model do not
-    # output probability for it. For other models it is handled by Orange
-    if num_classes is not None:
-        missing_d = num_classes - len(shap_values)
-        shap_values += [
-            np.zeros(shap_values[0].shape) for _ in range(missing_d)
+
+    if (
+        type(model.skl_model).__name__ in ("XGBClassifier", "XGBRFClassifier", "GradientBoostingClassifier")
+        and len(model.skl_model.classes_) == 2
+        and len(shap_values) == 1
+    ):
+        # workaround for the error in the TreeExplainer, for the binary
+        # classification the TreeExplainer returns explanations for class 1 only
+        # https://github.com/slundberg/shap/pull/1046
+        shap_values = [-shap_values[0], shap_values[0]]
+        base_value = np.array([-base_value, base_value])
+
+    # when while training one class value is missing in data but is still in
+    # variable's values skl_model do not output probability for it.
+    # Missing class cannot be explained, report zeros
+    class_ = model.domain.class_var
+    if class_.is_discrete and len(class_.values) > len(model.skl_model.classes_):
+        sklc = model.skl_model.classes_.astype(int).tolist()
+        shap_values = [
+            shap_values[sklc.index(i)] if i in sklc else np.zeros(shap_values[0].shape)
+            for i in range(len(class_.values))
         ]
-        base_value = np.hstack((base_value, np.zeros(missing_d)))
+        bv = np.zeros(len(class_.values))
+        bv[sklc] = base_value
+        base_value = bv
 
     return shap_values, sample_mask, base_value
 

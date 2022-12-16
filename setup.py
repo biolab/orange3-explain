@@ -44,7 +44,7 @@ INSTALL_REQUIRES = [
     "numpy",
     "pyqtgraph",
     "scipy",
-    "shap ==0.40.*",  # shap makes significant changes between versions
+    "shap ==0.41.*",  # shap makes significant changes between versions
     "scikit-learn>=1.0.1",
 ]
 
