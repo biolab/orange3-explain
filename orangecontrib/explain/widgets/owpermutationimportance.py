@@ -11,12 +11,12 @@ from AnyQt.QtWidgets import QGraphicsRectItem, QGraphicsSceneMouseEvent, \
 
 from Orange.base import Model
 from Orange.classification import RandomForestLearner
-from Orange.data import Table, DiscreteVariable, Domain, ContinuousVariable, \
-    StringVariable, HasClass
+from Orange.data import Table, Domain, ContinuousVariable, StringVariable, \
+    HasClass
 from Orange.evaluation.scoring import Score
 from Orange.regression import RandomForestRegressionLearner
 from Orange.widgets import gui
-from Orange.widgets.evaluate.utils import BUILTIN_SCORERS_ORDER, usable_scorers
+from Orange.widgets.evaluate.utils import usable_scorers
 from Orange.widgets.settings import Setting, ContextSetting, \
     PerfectDomainContextHandler
 from Orange.widgets.utils.concurrent import TaskState
@@ -256,8 +256,7 @@ class OWPermutationImportance(OWExplainFeatureBase):
     def _add_controls(self):
         box = gui.vBox(self.controlArea, "Parameters")
         self._score_combo: QComboBox = gui.comboBox(
-            box, self, "score_index", label="Score:",
-            items=BUILTIN_SCORERS_ORDER[DiscreteVariable],
+            box, self, "score_index", label="Score:", items=[],
             orientation=Qt.Horizontal, contentsLength=12,
             callback=self.__parameter_changed
         )
@@ -282,14 +281,12 @@ class OWPermutationImportance(OWExplainFeatureBase):
         super().openContext(model.domain if model else None)
 
     def setup_controls(self):
-        if self.model and self.model.domain.has_continuous_class:
-            class_type = ContinuousVariable
-        else:
-            class_type = DiscreteVariable
+        items = [s.name for s in usable_scorers(self.model.domain)] \
+            if self.model else []
         self._score_combo.clear()
-        items = BUILTIN_SCORERS_ORDER[class_type]
         self._score_combo.addItems(items)
-        self.score_index = items.index("R2") if "R2" in items else 0
+        if len(items) > 0:
+            self.score_index = items.index("R2") if "R2" in items else 0
 
     def get_runner_parameters(self) -> Tuple[Optional[Table], Optional[Model],
                                              Optional[Type[Score]], int]:
@@ -350,9 +347,9 @@ class OWPermutationImportance(OWExplainFeatureBase):
     def send_report(self):
         if not self.data or not self.model or not self.data.domain.class_var:
             return
-        var_type = type(self.data.domain.class_var)
+        scores = [s.name for s in usable_scorers(self.model.domain)]
         items = {
-            "Score": BUILTIN_SCORERS_ORDER[var_type][self.score_index],
+            "Score": scores[self.score_index],
             "Permutations": self.n_repeats,
         }
         self.report_items(items)
