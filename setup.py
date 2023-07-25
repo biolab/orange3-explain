@@ -12,7 +12,7 @@ VERSION = "0.6.5"
 AUTHOR = "Bioinformatics Laboratory, FRI UL"
 AUTHOR_EMAIL = "contact@orange.biolab.si"
 
-URL = "http://orange.biolab.si/download"
+URL = "https://orangedatamining.com/download"
 DESCRIPTION = "Orange3 add-on for explanatory AI"
 LONG_DESCRIPTION = open(
     path.join(path.dirname(__file__), "README.pypi"), "r", encoding="utf-8"
