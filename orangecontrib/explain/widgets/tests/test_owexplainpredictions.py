@@ -233,7 +233,7 @@ class TestOWExplainPredictions(WidgetTest):
 
         self.widget.graph.set_axis.reset_mock()
         simulate.combobox_activate_index(self.widget._annot_combo, 1)
-        args = ([[(0, "4"), (1, "5"), (2, "1"), (3, "3"), (4, "2")]],)
+        args = ([[(0, "1"), (1, "5"), (2, "4"), (3, "3"), (4, "2")]],)
         self.widget.graph.set_axis.assert_called_once_with(*args)
 
         self.send_signal(self.widget.Inputs.data, None)
