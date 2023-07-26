@@ -421,7 +421,7 @@ class OWExplainModel(OWExplainFeatureBase):
         if not self.selection and not any(mask):
             return
         self.selection = (attr_name, list(np.flatnonzero(mask)))
-        self.commit()
+        self.commit.deferred()
 
     def select_pending(self, pending_selection: Tuple):
         if not pending_selection or not pending_selection[1] \
