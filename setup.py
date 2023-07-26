@@ -38,10 +38,11 @@ DATA_FILES = [
 ]
 
 INSTALL_REQUIRES = [
-    "Orange3 >= 3.33.0",
-    "orange-widget-base",
     "AnyQt",
     "numpy",
+    "Orange3 >= 3.33.0",
+    "orange-widget-base",
+    "orange-canvas-core",
     "pyqtgraph",
     "scipy",
     "shap >=0.42.1",
