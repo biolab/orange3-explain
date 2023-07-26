@@ -596,7 +596,7 @@ def get_instance_ordering(
     NotImplementedError if unknown order_by.
     """
     if isinstance(order_by, Variable):
-        x_data = data.get_column_view(order_by)[0]
+        x_data = data.get_column(order_by)
         clust_ord = np.argsort(hclust_ordering(shap_values))
         return np.lexsort([clust_ord, x_data])
     elif order_by == ORIGINAL_ORDER:
