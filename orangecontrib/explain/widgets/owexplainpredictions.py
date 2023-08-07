@@ -587,7 +587,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
 
     def __on_selection_changed(self, selection: List[Tuple[float, float]]):
         self.selection_ranges = selection
-        self.commit()
+        self.commit.deferred()
 
     def _add_controls(self):
         box = gui.vBox(self.controlArea, "Target class")
@@ -624,12 +624,12 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     def __on_target_changed(self):
         self.selection_ranges = []
         self.setup_plot()
-        self.commit()
+        self.commit.deferred()
 
     def __on_order_changed(self):
         self.selection_ranges = []
         self.setup_plot()
-        self.commit()
+        self.commit.deferred()
 
     def __on_annot_changed(self):
         if not self.__results or not self.data:
@@ -717,7 +717,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
     def handleNewSignals(self):
         self.clear()
         self.start(run, self.data, self.background_data, self.model)
-        self.commit()
+        self.commit.deferred()
 
     def clear(self):
         self.__results = None
@@ -815,6 +815,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
             self.__on_selection_changed(selection_ranges)
             self.__pending_selection = []
 
+    @gui.deferred
     def commit(self):
         selected = None
         selected_indices = []

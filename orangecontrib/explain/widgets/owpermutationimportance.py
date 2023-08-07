@@ -315,7 +315,7 @@ class OWPermutationImportance(OWExplainFeatureBase):
             return
         assert self.results is not None
         self.selection = tuple(attr_names)
-        self.commit()
+        self.commit.deferred()
 
     def select_pending(self, pending_selection: Tuple):
         if not pending_selection or self.results is None:

@@ -1,12 +1,13 @@
 # pylint: disable=missing-docstring
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from AnyQt.QtCore import Qt, QPointF
 
 from Orange.classification import RandomForestLearner, CalibratedLearner, \
     ThresholdLearner, SimpleRandomForestLearner as SimpleRandomForestClassifier
 from Orange.data import Table
+from Orange.data.table import DomainTransformationError
 from Orange.regression import RandomForestRegressionLearner, \
     SimpleRandomForestLearner
 from Orange.tests.test_classification import all_learners as all_cls_learners
@@ -39,15 +40,19 @@ class TestOWICE(WidgetTest):
 
         self.send_signal(self.widget.Inputs.model, self.rf_reg)
         self.wait_until_finished()
-        self.assertTrue(self.widget.Error.unknown_err.is_shown())
+        # no error since no attributes in view and those no future is selected
+        self.assertFalse(self.widget.Error.unknown_err.is_shown())
 
         self.send_signal(self.widget.Inputs.model, None)
         self.assertFalse(self.widget.Error.unknown_err.is_shown())
 
-        self.send_signal(self.widget.Inputs.data, self.iris)
-        self.send_signal(self.widget.Inputs.model, self.rf_cls)
-        self.wait_until_finished()
-        self.assertTrue(self.widget.Error.domain_transform_err.is_shown())
+        with patch(
+            "orangecontrib.explain.widgets.owice.individual_condition_expectation",
+            side_effect=DomainTransformationError
+        ):
+            self.send_signal(self.widget.Inputs.model, self.rf_cls)
+            self.wait_until_finished()
+            self.assertTrue(self.widget.Error.domain_transform_err.is_shown())
 
     def test_output(self):
         self.send_signal(self.widget.Inputs.data, self.heart)

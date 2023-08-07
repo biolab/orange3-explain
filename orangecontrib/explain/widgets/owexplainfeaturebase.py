@@ -549,16 +549,17 @@ class OWExplainFeatureBase(OWWidget, ConcurrentWidgetMixin, openclass=True):
     def _clear_selection(self):
         if self.selection:
             self.selection = ()
-            self.commit()
+            self.commit.deferred()
 
     def update_selection(self, *_):
         raise NotImplementedError
 
     def select_pending(self, pending_selection: Tuple):
         self.__pending_selection = pending_selection
-        self.unconditional_commit()
+        self.commit.now()
 
     # Outputs
+    @gui.deferred
     def commit(self):
         selected_data = self.get_selected_data()
         if not selected_data:

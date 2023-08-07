@@ -276,7 +276,7 @@ class TestExplainer(unittest.TestCase):
                 if learner == CurveFitLearner:
                     attr = self.housing.domain.attributes
                     learner = CurveFitLearner(
-                        lambda x, a: np.sum(x[:, i] for i in range(len(attr))),
+                        lambda x, a: sum(x[:, i] for i in range(len(attr))),
                         [], [a.name for a in self.housing.domain.attributes]
                     )
                 else:

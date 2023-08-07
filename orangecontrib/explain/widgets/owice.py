@@ -5,7 +5,7 @@ from xml.sax.saxutils import escape
 
 import numpy as np
 from AnyQt.QtCore import Qt, QSortFilterProxyModel, QSize, QModelIndex, \
-    QItemSelection, QPointF, Signal, QLineF
+    QPointF, Signal, QLineF
 from AnyQt.QtGui import QColor
 from AnyQt.QtWidgets import QComboBox, QSizePolicy, QGraphicsSceneHelpEvent, \
     QToolTip, QGraphicsLineItem, QApplication
@@ -13,7 +13,7 @@ from AnyQt.QtWidgets import QComboBox, QSizePolicy, QGraphicsSceneHelpEvent, \
 import pyqtgraph as pg
 
 from orangecanvas.gui.utils import disconnected
-from orangewidget.utils.listview import ListViewSearch
+from orangewidget.utils.listview import ListViewFilter
 
 from Orange.base import Model
 from Orange.data import Table, ContinuousVariable, Variable, \
@@ -261,7 +261,7 @@ class ICEPlot(PlotWidget):
         )
 
         # points
-        x_data = self.__data.get_column_view(self.__feature)[0][indices]
+        x_data = self.__data.get_column(self.__feature)[indices]
         n_dec = self.__feature.number_of_decimals
         y_data = []
         for i, x in zip(indices, x_data):
@@ -537,7 +537,7 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
         self.domain: Optional[Domain] = None
         self.graph: ICEPlot = None
         self._target_combo: QComboBox = None
-        self._features_view: ListViewSearch = None
+        self._features_view: ListViewFilter = None
         self._features_model: VariableListModel = None
         self._color_model: DomainModel = None
 
@@ -571,10 +571,10 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
         box = gui.vBox(self.controlArea, "Feature")
         self._features_model = VariableListModel()
         sorted_model = SortProxyModel(sortRole=Qt.UserRole)
-        sorted_model.setSourceModel(self._features_model)
         sorted_model.sort(0)
-        self._features_view = ListViewSearch()
-        self._features_view.setModel(sorted_model)
+        self._features_view = ListViewFilter(
+            model=self._features_model, proxy=sorted_model
+        )
         self._features_view.setMinimumSize(QSize(30, 100))
         self._features_view.setSizePolicy(QSizePolicy.Expanding,
                                           QSizePolicy.Expanding)
@@ -600,12 +600,9 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
         self._apply_feature_sorting()
         self.__on_parameter_changed()
 
-    def __on_feature_changed(self, selection: QItemSelection):
-        if not selection:
-            return
-
-        self.feature = selection.indexes()[0].data(gui.TableVariable)
-        self._apply_feature_sorting()
+    def __on_feature_changed(self):
+        selection = self._features_view.selectionModel().selectedIndexes()
+        self.feature = selection[0].data(gui.TableVariable) if selection else None
         self._run()
 
     def __on_order_changed(self):
@@ -788,7 +785,7 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
         color_labels = None
         if self.color_var and self.color_var.is_discrete:
             colors = self.color_var.colors
-            color_col = self.data[mask].get_column_view(self.color_var)[0]
+            color_col = self.data[mask].get_column(self.color_var)
             color_labels = self.color_var.values
 
         self.graph.set_data(self.data[mask], self.feature,
