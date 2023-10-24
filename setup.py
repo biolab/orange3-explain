@@ -39,6 +39,9 @@ DATA_FILES = [
 
 INSTALL_REQUIRES = [
     "AnyQt",
+    # shap's requirement, force users for numba to get updated because compatibility
+    # issues with numpy - completely remove this pin after october 2024
+    "numba >=0.58",
     "numpy",
     "Orange3 >=3.34.0",
     "orange-canvas-core >=0.1.28",
