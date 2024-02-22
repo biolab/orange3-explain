@@ -21,6 +21,10 @@ from Orange.widgets import gui
 from Orange.widgets.settings import Setting
 from Orange.widgets.utils.concurrent import ConcurrentWidgetMixin, TaskState
 from Orange.widgets.utils.graphicslayoutitem import SimpleLayoutItem
+try:
+    from Orange.widgets.utils.multi_target import check_multiple_targets_input
+except ImportError:
+    check_multiple_targets_input = lambda f: f
 from Orange.widgets.utils.sql import check_sql_input
 from Orange.widgets.utils.state_summary import format_summary_details
 from Orange.widgets.utils.stickygraphicsview import StickyGraphicsView
@@ -462,6 +466,7 @@ class OWExplainFeatureBase(OWWidget, ConcurrentWidgetMixin, openclass=True):
     # Inputs
     @Inputs.data
     @check_sql_input
+    @check_multiple_targets_input
     def set_data(self, data: Optional[Table]):
         self.data = data
         summary = len(data) if data else self.info.NoInput
@@ -473,6 +478,7 @@ class OWExplainFeatureBase(OWWidget, ConcurrentWidgetMixin, openclass=True):
         pass
 
     @Inputs.model
+    @check_multiple_targets_input
     def set_model(self, model: Optional[Model]):
         self.closeContext()
         self.model = model
