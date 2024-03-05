@@ -202,8 +202,11 @@ def individual_condition_expectation(
     feature_index = data.domain.index(feature.name)
 
     # fake sklearn estimator
-    model.fit = None
-    model.fit_ = None
+    def dummy_fit(*_, **__):
+        raise NotImplementedError()
+
+    model.fit = dummy_fit
+    model.fit_ = dummy_fit
     if model.domain.class_var.is_discrete:
         model._estimator_type = "classifier"
         model.classes_ = model.domain.class_var.values

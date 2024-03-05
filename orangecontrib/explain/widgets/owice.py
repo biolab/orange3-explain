@@ -37,6 +37,10 @@ from Orange.widgets.widget import Input, OWWidget, Msg, Output
 
 from orangecontrib.explain.inspection import individual_condition_expectation
 from orangewidget.utils.visual_settings_dlg import VisualSettingsDialog
+try:
+    from Orange.widgets.utils.multi_target import check_multiple_targets_input
+except ImportError:
+    check_multiple_targets_input = lambda f: f
 
 
 class RunnerResults(SimpleNamespace):
@@ -621,12 +625,14 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
 
     @Inputs.data
     @check_sql_input
+    @check_multiple_targets_input
     def set_data(self, data: Optional[Table]):
         self.data = data
         self.__sampled_mask = None
         self._check_data()
 
     @Inputs.model
+    @check_multiple_targets_input
     def set_model(self, model: Optional[Model]):
         self.model = model
 

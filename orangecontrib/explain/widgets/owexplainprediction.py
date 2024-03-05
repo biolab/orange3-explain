@@ -17,6 +17,10 @@ from Orange.base import Model
 from Orange.data import Table, Domain, ContinuousVariable, StringVariable
 from Orange.data.table import DomainTransformationError
 from Orange.widgets import gui
+try:
+    from Orange.widgets.utils.multi_target import check_multiple_targets_input
+except ImportError:
+    check_multiple_targets_input = lambda f: f
 from Orange.widgets.settings import Setting, ContextSetting, \
     ClassValuesContextHandler
 from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
@@ -574,15 +578,18 @@ class OWExplainPrediction(OWWidget, ConcurrentWidgetMixin):
 
     @Inputs.data
     @check_sql_input
+    @check_multiple_targets_input
     def set_data(self, data: Optional[Table]):
         self.data = data
 
     @Inputs.background_data
     @check_sql_input
+    @check_multiple_targets_input
     def set_background_data(self, data: Optional[Table]):
         self.background_data = data
 
     @Inputs.model
+    @check_multiple_targets_input
     def set_model(self, model: Optional[Model]):
         self.closeContext()
         self.model = model
@@ -614,7 +621,9 @@ class OWExplainPrediction(OWWidget, ConcurrentWidgetMixin):
         self.__results = None
         self.cancel()
         self.clear_scene()
-        self.clear_messages()
+        self.Error.domain_transform_err.clear()
+        self.Error.unknown_err.clear()
+        self.Information.multiple_instances.clear()
 
     def check_inputs(self):
         if self.data and len(self.data) > 1:

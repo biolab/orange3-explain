@@ -19,6 +19,10 @@ from Orange.base import Model
 from Orange.data import Table, Domain, ContinuousVariable, Variable
 from Orange.data.table import DomainTransformationError
 from Orange.widgets import gui
+try:
+    from Orange.widgets.utils.multi_target import check_multiple_targets_input
+except ImportError:
+    check_multiple_targets_input = lambda f: f
 from Orange.widgets.settings import ContextSetting, Setting, \
     PerfectDomainContextHandler
 from Orange.widgets.utils.annotated_data import ANNOTATED_DATA_SIGNAL_NAME, \
@@ -649,6 +653,7 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
 
     @Inputs.data
     @check_sql_input
+    @check_multiple_targets_input
     def set_data(self, data: Optional[Table]):
         self.closeContext()
         self.data = data
@@ -658,10 +663,12 @@ class OWExplainPredictions(OWWidget, ConcurrentWidgetMixin):
 
     @Inputs.background_data
     @check_sql_input
+    @check_multiple_targets_input
     def set_background_data(self, data: Optional[Table]):
         self.background_data = data
 
     @Inputs.model
+    @check_multiple_targets_input
     def set_model(self, model: Optional[Model]):
         self.model = model
 
