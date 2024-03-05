@@ -1,0 +1,14 @@
+name: Release
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+  pull_request: # todo: remove
+    branches:
+      - master
+
+jobs:
+  release:
+    uses: biolab/orange-ci-cd/.github/workflows/release.yml@master
+    with:
+      pure-python: true
