@@ -228,7 +228,7 @@ def individual_condition_expectation(
     if data.domain.has_discrete_class and \
             len(data.domain.class_var.values) == 2:
         results = {"average": np.vstack([1 - dep["average"], dep["average"]]),
-                   "values": dep["values"][0]}
+                   "values": dep["grid_values"][0]}
         if kind == "both":
             results["individual"] = \
                 np.vstack([1 - dep["individual"], dep["individual"]])
