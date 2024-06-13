@@ -43,9 +43,9 @@ INSTALL_REQUIRES = [
     # issues with numpy - completely remove this pin after october 2024
     "numba >=0.58",
     "numpy",
-    "Orange3 >=3.34.0",
-    "orange-canvas-core >=0.1.28",
-    "orange-widget-base >=4.19.0",
+    "Orange3 >=3.36.2",
+    "orange-canvas-core >=0.1.30",
+    "orange-widget-base >=4.22.0",
     "pyqtgraph",
     "scipy",
     "shap==0.42.1",
