@@ -49,7 +49,7 @@ INSTALL_REQUIRES = [
     "pyqtgraph",
     "scipy",
     "shap >=0.42.1",
-    "scikit-learn>=1.0.1",
+    "scikit-learn>=1.3.0",
 ]
 
 EXTRAS_REQUIRE = {
