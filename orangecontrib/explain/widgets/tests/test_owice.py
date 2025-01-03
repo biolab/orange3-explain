@@ -5,7 +5,8 @@ from unittest.mock import Mock, patch
 from AnyQt.QtCore import Qt, QPointF
 
 from Orange.classification import RandomForestLearner, CalibratedLearner, \
-    ThresholdLearner, SimpleRandomForestLearner as SimpleRandomForestClassifier
+    ThresholdLearner, NaiveBayesLearner, \
+    SimpleRandomForestLearner as SimpleRandomForestClassifier
 from Orange.data import Table
 from Orange.data.table import DomainTransformationError
 from Orange.regression import RandomForestRegressionLearner, \
@@ -176,6 +177,18 @@ class TestOWICE(WidgetTest):
         self.send_signal(self.widget.Inputs.data, self.housing[:10])
         self.send_signal(self.widget.Inputs.model, self.rf_reg)
         self.widget.send_report()
+
+    def test_naive_bayes(self):
+        data = self.iris
+        self.send_signal(self.widget.Inputs.data, data)
+
+        self.send_signal(self.widget.Inputs.model, NaiveBayesLearner()(data))
+        self.wait_until_finished()
+        self.assertTrue(self.widget.Warning.pp_feature.is_shown())
+
+        self.send_signal(self.widget.Inputs.model, self.rf_cls)
+        self.wait_until_finished()
+        self.assertFalse(self.widget.Warning.pp_feature.is_shown())
 
 
 if __name__ == "__main__":

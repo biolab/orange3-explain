@@ -508,6 +508,9 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
         not_enough_data = Msg("At least two instances are needed.")
         no_cont_features = Msg("At least one numeric feature is required.")
 
+    class Warning(OWWidget.Warning):
+        pp_feature = Msg("Selected feature has been preprocessed.")
+
     class Information(OWWidget.Information):
         data_sampled = Msg("Data has been sampled.")
 
@@ -762,6 +765,7 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
         self.cancel()
         self.Error.domain_transform_err.clear()
         self.Error.unknown_err.clear()
+        self.Warning.pp_feature.clear()
         self.graph.clear_all()
 
     def setup_plot(self):
@@ -772,6 +776,13 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
         x_data = self.__results.x_data
         y_average = self.__results.y_average[self.target_index]
         y_individual = self.__results.y_individual[self.target_index]
+
+        data = self.data[self.__sampled_mask]
+        orig_values = data[:, self.feature].X.flatten()
+        _, index = np.unique(orig_values, return_index=True)
+        orig_values = orig_values[index]
+        if len(orig_values) != len(x_data) or (orig_values != x_data).any():
+            self.Warning.pp_feature()
 
         class_var: Variable = self.model.original_domain.class_var
         if class_var.is_discrete:
