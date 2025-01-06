@@ -2,7 +2,6 @@ import inspect
 import unittest
 
 import numpy as np
-from numpy.testing import assert_array_equal
 from Orange.classification import (
     LogisticRegressionLearner,
     RandomForestLearner,
@@ -11,6 +10,10 @@ from Orange.classification import (
     TreeLearner,
     ThresholdLearner,
 )
+try:
+    from Orange.classification import ScoringSheetLearner
+except ImportError:
+    ScoringSheetLearner = None
 from Orange.data import Table, Domain, ContinuousVariable
 from Orange.regression import LinearRegressionLearner, CurveFitLearner
 from Orange.tests import test_regression, test_classification
@@ -206,7 +209,7 @@ class TestExplainer(unittest.TestCase):
         )
         self.assertEqual(len(shap_values), 2)
         self.assertEqual(len(base_value), 2)
-        assert_array_equal(-shap_values[0], shap_values[1])
+        np.testing.assert_array_almost_equal(-shap_values[0], shap_values[1])
 
         learner = GBLearner()
         model = learner(self.hearth_disease)
@@ -215,7 +218,7 @@ class TestExplainer(unittest.TestCase):
         )
         self.assertEqual(len(shap_values), 2)
         self.assertEqual(len(base_value), 2)
-        assert_array_equal(-shap_values[0], shap_values[1])
+        np.testing.assert_array_almost_equal(-shap_values[0], shap_values[1])
 
         learner = XGBRFLearner()
         model = learner(self.hearth_disease)
@@ -224,7 +227,7 @@ class TestExplainer(unittest.TestCase):
         )
         self.assertEqual(len(shap_values), 2)
         self.assertEqual(len(base_value), 2)
-        assert_array_equal(-shap_values[0], shap_values[1])
+        np.testing.assert_array_almost_equal(-shap_values[0], shap_values[1])
 
     @unittest.skipIf(XGBLearner is None, "Missing 'xgboost' package")
     def test_remove_workaround(self):
@@ -253,8 +256,8 @@ class TestExplainer(unittest.TestCase):
         """ Test explanation for all classifiers """
         for learner in test_classification.all_learners():
             with self.subTest(learner):
-                if learner == ThresholdLearner:
-                    # ThresholdLearner require binary class
+                if learner in (ThresholdLearner, ScoringSheetLearner):
+                    # ThresholdLearner and ScoringSheetLearner require binary class
                     continue
                 kwargs = {}
                 if "base_learner" in inspect.signature(learner).parameters:

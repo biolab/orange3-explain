@@ -203,7 +203,7 @@ def individual_condition_expectation(
     model.fit_ = dummy_fit
     if model.domain.class_var.is_discrete:
         model._estimator_type = "classifier"
-        model.classes_ = model.domain.class_var.values
+        model.classes_ = np.array(model.domain.class_var.values)
     else:
         model._estimator_type = "regressor"
 
