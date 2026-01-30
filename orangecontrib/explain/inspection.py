@@ -4,6 +4,7 @@ from typing import Callable, Dict
 import numpy as np
 import scipy.sparse as sp
 from sklearn.inspection import partial_dependence
+from sklearn.utils import Tags, TargetTags
 
 from Orange.base import Model
 from Orange.classification import Model as ClsModel
@@ -202,11 +203,13 @@ def individual_condition_expectation(
     model.fit = dummy_fit
     model.fit_ = dummy_fit
     if model.domain.class_var.is_discrete:
-        model._estimator_type = "classifier"
         model.classes_ = np.array(model.domain.class_var.values)
+        estimator_type = "classifier"
     else:
-        model._estimator_type = "regressor"
+        estimator_type = "regressor"
 
+    model.__sklearn_tags__ = lambda: Tags(estimator_type=estimator_type,
+                                          target_tags=TargetTags(required=True))
     progress_callback(0.1)
 
     dep = partial_dependence(model,

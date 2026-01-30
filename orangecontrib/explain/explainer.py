@@ -60,12 +60,17 @@ def _join_shap_values(
     of lists with the np.ndarray for each class, when explaining regression,
     the result is the list of one np.ndarrays.
     """
-    if isinstance(shap_values[0], np.ndarray):
-        # regression
+    shape = shap_values[0].shape
+    if len(shape) == 1 or (len(shape) == 2 and shape[0] == 1):
+        # regression and xgb with two classes
         return [np.vstack(shap_values)]
     else:
         # classification
-        return [np.vstack(s) for s in zip(*shap_values)]
+        if len(shape) == 3:
+            transformed = [(np.squeeze(v, axis=0)).T for v in shap_values]
+        else:
+            transformed = [v.T for v in shap_values]
+        return [np.vstack(s) for s in zip(*transformed)]
 
 
 def _explain_trees(

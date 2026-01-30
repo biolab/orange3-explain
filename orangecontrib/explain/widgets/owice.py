@@ -26,6 +26,7 @@ from Orange.widgets.utils.annotated_data import ANNOTATED_DATA_SIGNAL_NAME, \
     create_annotated_table
 from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
 from Orange.widgets.utils.itemmodels import VariableListModel, DomainModel
+from Orange.widgets.utils.multi_target import check_multiple_targets_input
 from Orange.widgets.utils.sql import check_sql_input
 from Orange.widgets.utils.widgetpreview import WidgetPreview
 from Orange.widgets.visualize.owdistributions import LegendItem
@@ -37,10 +38,6 @@ from Orange.widgets.widget import Input, OWWidget, Msg, Output
 
 from orangecontrib.explain.inspection import individual_condition_expectation
 from orangewidget.utils.visual_settings_dlg import VisualSettingsDialog
-try:
-    from Orange.widgets.utils.multi_target import check_multiple_targets_input
-except ImportError:
-    check_multiple_targets_input = lambda f: f
 
 
 class RunnerResults(SimpleNamespace):
@@ -734,7 +731,7 @@ class OWICE(OWWidget, ConcurrentWidgetMixin):
         if self.order_by_importance:
             def compute_score(feature):
                 values = self.__results_avgs[feature][self.target_index]
-                return -np.sum(np.abs(values - np.mean(values)))
+                return float(-np.sum(np.abs(values - np.mean(values))))
 
             try:
                 if self.__results_avgs is None:
