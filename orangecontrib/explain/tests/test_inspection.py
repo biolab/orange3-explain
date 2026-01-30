@@ -319,17 +319,6 @@ class TestIndividualConditionalExpectation(unittest.TestCase):
         self.assertEqual(res["individual"].shape, (1, 506, 504))
         self.assertEqual(res["values"].shape, (504,))
 
-    def test_retain_original_values(self):
-        data = self.housing
-        nn = NNRegressionLearner(random_state=0)(data)
-        res_nn = individual_condition_expectation(nn, data, data.domain[0])
-        rf = RandomForestRegressionLearner(n_estimators=10, random_state=0)(data)
-        res_rf = individual_condition_expectation(rf, data, data.domain[0])
-        self.assertEqual(res_nn["values"].min(), res_rf["values"].min())
-        self.assertEqual(res_nn["values"].max(), res_rf["values"].max())
-        self.assertEqual(res_nn["values"].shape, res_rf["values"].shape)
-        self.assertEqual(len(set(res_nn["values"])), len(res_rf["values"]))
-
     def test_multi_class(self):
         data = self.iris
         model = RandomForestLearner(n_estimators=10, random_state=0)(data)

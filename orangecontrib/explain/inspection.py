@@ -189,13 +189,7 @@ def individual_condition_expectation(
     _check_data(data)
 
     # implicit check if feature in data.domain
-    needs_pp = _check_model(model, data)
-
-    # values should not be preprocessed
-    orig_values = data[:, feature].X.flatten()
-    _, index = np.unique(orig_values, return_index=True)
-    orig_values = orig_values[index]
-    if needs_pp:
+    if _check_model(model, data):
         data = model.data_to_model_domain(data)
 
     assert feature.name in [a.name for a in data.domain.attributes]
@@ -209,7 +203,7 @@ def individual_condition_expectation(
     model.fit_ = dummy_fit
     if model.domain.class_var.is_discrete:
         model._estimator_type = "classifier"
-        model.classes_ = model.domain.class_var.values
+        model.classes_ = np.array(model.domain.class_var.values)
     else:
         model._estimator_type = "regressor"
 
@@ -221,7 +215,7 @@ def individual_condition_expectation(
                              grid_resolution=grid_resolution,
                              kind=kind)
 
-    results = {"average": dep["average"], "values": orig_values}
+    results = {"average": dep["average"], "values": dep["grid_values"][0]}
     if kind == "both":
         results["individual"] = dep["individual"]
 
