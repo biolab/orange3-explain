@@ -281,19 +281,19 @@ class TestOWPermutationImportance(WidgetTest):
         self.send_signal(self.widget.Inputs.model, self.rf_cls)
         self.wait_until_finished()
         label: QGraphicsTextItem = self.widget.plot.bottom_axis.label
-        self.assertEqual(label.toPlainText(), "Decrease in AUC ")
+        self.assertIn("Decrease in AUC", label.toPlainText())
 
         self.send_signal(self.widget.Inputs.data, self.housing)
         self.send_signal(self.widget.Inputs.model, self.rf_reg)
         self.wait_until_finished()
         label: QGraphicsTextItem = self.widget.plot.bottom_axis.label
-        self.assertEqual(label.toPlainText(), "Decrease in R2 ")
+        self.assertIn("Decrease in R2", label.toPlainText())
 
         score_cb: QComboBox = self.widget._score_combo
         simulate.combobox_activate_item(score_cb, "MSE")
         self.wait_until_finished()
         label: QGraphicsTextItem = self.widget.plot.bottom_axis.label
-        self.assertEqual(label.toPlainText(), "Increase in MSE ")
+        self.assertIn("Increase in MSE", label.toPlainText())
 
     @unittest.mock.patch("orangecontrib.explain.widgets."
                          "owpermutationimportance.OWPermutationImportance.run")

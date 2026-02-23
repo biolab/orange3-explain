@@ -38,18 +38,16 @@ DATA_FILES = [
 ]
 
 INSTALL_REQUIRES = [
-    "AnyQt",
-    # shap's requirement, force users for numba to get updated because compatibility
-    # issues with numpy - completely remove this pin after october 2024
-    "numba >=0.58",
-    "numpy",
-    "Orange3 >=3.36.2",
-    "orange-canvas-core >=0.1.30",
-    "orange-widget-base >=4.22.0",
-    "pyqtgraph",
-    "scipy",
-    "shap==0.42.1",
-    "scikit-learn>=1.3.0",
+    "AnyQt>=0.2.0",
+    "Orange3>=3.39.0",
+    "orange-canvas-core>=0.2.5",
+    "orange-widget-base>=4.25.0",
+    "pandas>=2.2.2",
+    "scikit-learn>=1.7.0",
+    "scipy>=1.13.0",
+    "pyqtgraph>=0.13.1",
+    "numpy>=2.0.0",
+    "shap>=0.50.0",
 ]
 
 EXTRAS_REQUIRE = {
